@@ -1,6 +1,6 @@
 -include ~/.claude/Makefile
 
-.PHONY: env-dev env-run install-pythons test test-cov test-all format lint typecheck check run docs docs-view build pre-publish publish publish-test clean clean-all help
+.PHONY: env-dev env-run install-pythons test test-cov test-all format format-check lint typecheck check run docs docs-view build pre-publish publish publish-test clean clean-all help
 
 ## Environment
 
@@ -10,8 +10,8 @@ env-dev: ## Install all dependencies (dev + docs)
 env-run: ## Install runtime dependencies only
 	uv sync
 
-install-pythons: ## Install Python 3.11, 3.12
-	uv python install 3.11 3.12
+install-pythons: ## Install Python 3.10, 3.11, 3.12
+	uv python install 3.10 3.11 3.12
 
 ## Testing
 
@@ -30,13 +30,16 @@ format: env-dev ## Format code and fix linting issues
 	uv run ruff format src tests
 	uv run ruff check --fix src tests
 
+format-check: env-dev ## Check code formatting without modifying
+	uv run ruff format --check src tests
+
 lint: env-dev ## Check code for linting issues
 	uv run ruff check src tests
 
 typecheck: env-dev ## Run type checking
 	uv run mypy src
 
-check: format lint typecheck test ## Run all quality checks
+check: format-check lint typecheck test ## Run all quality checks
 
 ## Running
 
