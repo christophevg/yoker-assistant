@@ -123,10 +123,3 @@ commands_pre = [
   ["uv", "pip", "install", "pytest", "pytest-cov", "pytest-asyncio"],
 ]
 commands = [["pytest", "tests", "-v", "--cov=yoker_assistant", "--cov-report=term-missing"]]
-
-# Local development wiring — use sibling checkouts for yoker, simple-email-gw,
-# and pkgq. Remove this section before publishing to PyPI.
-[tool.uv.sources]
-yoker = { path = "../yoker", editable = true }
-simple-email-gw = { path = "../simple-email-gw", editable = true }
-pkgq = { path = "../pkgq", editable = true }
