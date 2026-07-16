@@ -1,22 +1,61 @@
-name: CI
+name: Test
 
 on:
   push:
+    branches: [master]
   pull_request:
+  workflow_dispatch:
 
 jobs:
-  check:
-    runs-on: ubuntu-latest
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: ["ubuntu-latest", "macos-latest", "windows-latest"]
+        python-version: ["3.10", "3.11", "3.12"]
+
     steps:
       - uses: actions/checkout@v5
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v8.2.0
         with:
           version: "latest"
 
-      - name: Set up Python
-        run: uv python install 3.11
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
 
-      - name: Run quality checks
-        run: make check
+      - name: Install dependencies
+        run: uv sync --frozen --all-extras
+
+      - name: Run tests
+        run: uv run pytest -v --cov=src --cov-report=xml
+
+      - name: Upload coverage to Coveralls
+        uses: coverallsapp/github-action@v2
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.10'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          file: ./coverage.xml
+          fail-on-error: false
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v8.2.0
+        with:
+          version: "latest"
+      - run: uv sync --frozen --all-extras
+      - run: uv run ruff check src tests
+      - run: uv run ruff format --check src tests
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v8.2.0
+        with:
+          version: "latest"
+      - run: uv sync --frozen --all-extras
+      - run: uv run mypy src
