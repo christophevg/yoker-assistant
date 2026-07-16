@@ -2010,33 +2010,17 @@ wheels = [
 [[package]]
 name = "pkgq"
 version = "0.3.2"
-source = { editable = "../pkgq" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "httpx" },
     { name = "pydantic" },
     { name = "rich" },
     { name = "yoker" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "build", marker = "extra == 'dev'", specifier = ">=1.0.0" },
-    { name = "coveralls", marker = "extra == 'dev'", specifier = ">=3.3.0" },
-    { name = "fastmcp", marker = "extra == 'mcp'", specifier = ">=3.0.0" },
-    { name = "httpx", specifier = ">=0.27.0" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.13.0" },
-    { name = "pydantic", specifier = ">=2.0.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "rich", specifier = ">=13.0.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
-    { name = "tox", marker = "extra == 'dev'", specifier = ">=4.0.0" },
-    { name = "tox-uv", marker = "extra == 'dev'", specifier = ">=1.0.0" },
-    { name = "twine", marker = "extra == 'dev'", specifier = ">=6.0.0" },
-    { name = "yoker", specifier = ">=0.5.0" },
+sdist = { url = "https://files.pythonhosted.org/packages/b8/be/1da18829836f4db7535d5ca09ce34f3c3cd56c790f803d9f96c72b127bdb/pkgq-0.3.2.tar.gz", hash = "sha256:2e28dd1074a932cffb2e7c8ad70cbfa9dba61ceca4990dacf404c7dd80731d14", size = 166860, upload-time = "2026-06-26T13:22:39.85Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/58/0a/0ecb43b4b8d24ea8fd245e2a863bf1192800f613bbc8b5c86ff69bc129ba/pkgq-0.3.2-py3-none-any.whl", hash = "sha256:7ecf7b78c27fb27b21d5c93b8176ea49c111dbc8a2d52372fd31fe4ee1a13473", size = 17361, upload-time = "2026-06-26T13:22:38.211Z" },
 ]
-provides-extras = ["mcp", "dev"]
 
 [[package]]
 name = "platformdirs"
@@ -2927,8 +2911,8 @@ name = "secretstorage"
 version = "3.5.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "cryptography" },
-    { name = "jeepney" },
+    { name = "cryptography", marker = "python_full_version < '3.12' or python_full_version >= '3.15' or sys_platform != 'win32'" },
+    { name = "jeepney", marker = "python_full_version < '3.12' or python_full_version >= '3.15' or sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/1c/03/e834bcd866f2f8a49a85eaff47340affa3bfa391ee9912a952a1faa68c7b/secretstorage-3.5.0.tar.gz", hash = "sha256:f04b8e4689cbce351744d5537bf6b1329c6fc68f91fa666f60a380edddcd11be", size = 19884, upload-time = "2025-11-23T19:02:53.191Z" }
 wheels = [
@@ -2947,7 +2931,7 @@ wheels = [
 [[package]]
 name = "simple-email-gw"
 version = "0.3.0"
-source = { editable = "../simple-email-gw" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aioimaplib" },
     { name = "aiosmtplib" },
@@ -2958,32 +2942,10 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "rich" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "aioimaplib", specifier = ">=1.0.0" },
-    { name = "aiosmtplib", specifier = ">=3.0.0" },
-    { name = "build", marker = "extra == 'dev'", specifier = ">=1.0.0" },
-    { name = "coveralls", marker = "extra == 'dev'", specifier = ">=3.3.0" },
-    { name = "fastmcp", specifier = ">=3.0.0" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.13.0" },
-    { name = "myst-parser", marker = "extra == 'docs'", specifier = ">=2.0.0" },
-    { name = "prompt-toolkit", specifier = ">=3.0.0" },
-    { name = "pydantic", specifier = ">=2.0.0" },
-    { name = "pydantic-settings", specifier = ">=2.0.0" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "python-dotenv", specifier = ">=1.2.2" },
-    { name = "rich", specifier = ">=13.0.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
-    { name = "sphinx", marker = "extra == 'docs'", specifier = ">=7.0.0" },
-    { name = "sphinx-rtd-theme", marker = "extra == 'docs'", specifier = ">=2.0.0" },
-    { name = "tox", marker = "extra == 'dev'", specifier = ">=4.0.0" },
-    { name = "tox-uv", marker = "extra == 'dev'", specifier = ">=1.0.0" },
-    { name = "twine", marker = "extra == 'dev'", specifier = ">=6.0.0" },
+sdist = { url = "https://files.pythonhosted.org/packages/01/a3/b842905ac926344944ebc15ce1b103c7db47e436a3c57464501e1d990f8d/simple_email_gw-0.3.0.tar.gz", hash = "sha256:0ed146032e5c7baea0bfbd352cfc3e704d05e7b29b5e7c264b2f0ade4f179f62", size = 795303, upload-time = "2026-06-17T21:41:06.503Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7d/09/844185c45068308d0fec148e30ecc2bb5891776670d581dff923f8d02d66/simple_email_gw-0.3.0-py3-none-any.whl", hash = "sha256:3d96bad858aafe8feefccf1e179b7b42f49562ad9510a89a4b40c9eda518c5bf", size = 54528, upload-time = "2026-06-17T21:41:04.518Z" },
 ]
-provides-extras = ["docs", "dev"]
 
 [[package]]
 name = "sniffio"
@@ -3839,7 +3801,7 @@ wheels = [
 [[package]]
 name = "yoker"
 version = "0.8.0"
-source = { editable = "../yoker" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "clevis", extra = ["tomlev"] },
     { name = "dacite" },
@@ -3853,39 +3815,10 @@ dependencies = [
     { name = "rich" },
     { name = "structlog" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "build", marker = "extra == 'dev'", specifier = ">=1.0.0" },
-    { name = "clevis", extras = ["tomlev"], specifier = ">=0.7.0" },
-    { name = "coveralls", marker = "extra == 'dev'", specifier = ">=3.3.0" },
-    { name = "dacite", specifier = ">=1.8.0" },
-    { name = "httpx", specifier = ">=0.25.0" },
-    { name = "litellm", specifier = ">=1.90.0" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.13.0" },
-    { name = "myst-parser", marker = "extra == 'docs'", specifier = ">=2.0.0" },
-    { name = "ollama", specifier = ">=0.6.0" },
-    { name = "prompt-toolkit", specifier = ">=3.0.0" },
-    { name = "pyfiglet", specifier = ">=1.0.4" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.10.0" },
-    { name = "python-dotenv", specifier = ">=1.0.0" },
-    { name = "python-magic", marker = "sys_platform != 'win32' and extra == 'magic'", specifier = ">=0.4.27" },
-    { name = "python-magic-bin", marker = "sys_platform == 'win32' and extra == 'magic'", specifier = ">=0.4.14" },
-    { name = "pyyaml", specifier = ">=6.0" },
-    { name = "rich", specifier = ">=14.0.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
-    { name = "sphinx", marker = "extra == 'docs'", specifier = ">=7.0.0" },
-    { name = "sphinx-rtd-theme", marker = "extra == 'docs'", specifier = ">=2.0.0" },
-    { name = "structlog", specifier = ">=23.3.0" },
-    { name = "tox", marker = "extra == 'dev'", specifier = ">=4.0.0" },
-    { name = "tox-uv", marker = "extra == 'dev'", specifier = ">=1.0.0" },
-    { name = "twine", marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0" },
+sdist = { url = "https://files.pythonhosted.org/packages/18/9d/d6a3ec67de4a4be93e8308f1331de3b517e8be4728668b31be66017d2aa8/yoker-0.8.0.tar.gz", hash = "sha256:48e7cc27a5e3b0186ac2dfef807abada52158b6699b5c4ef833109b311b01738", size = 8620044, upload-time = "2026-07-15T19:39:53.543Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1c/16/3b45dd2cbcaec356cd96ed3e2531f7da44741a675115a6b8eb98c50973f3/yoker-0.8.0-py3-none-any.whl", hash = "sha256:63b7c214ec4df2bfba659d0e0026e0323347cfb4c71b33b87822eea6c834cdb9", size = 241720, upload-time = "2026-07-15T19:39:42.389Z" },
 ]
-provides-extras = ["dev", "docs", "magic"]
 
 [[package]]
 name = "yoker-assistant"
@@ -3923,18 +3856,18 @@ requires-dist = [
     { name = "coveralls", marker = "extra == 'dev'", specifier = ">=3.3.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.13.0" },
     { name = "myst-parser", marker = "extra == 'docs'", specifier = ">=2.0.0" },
-    { name = "pkgq", editable = "../pkgq" },
+    { name = "pkgq" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.8.0" },
-    { name = "simple-email-gw", editable = "../simple-email-gw" },
+    { name = "simple-email-gw" },
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=7.0.0" },
     { name = "sphinx-rtd-theme", marker = "extra == 'docs'", specifier = ">=2.0.0" },
     { name = "tox", marker = "extra == 'dev'", specifier = ">=4.0.0" },
     { name = "tox-uv", marker = "extra == 'dev'", specifier = ">=1.0.0" },
     { name = "twine", marker = "extra == 'dev'", specifier = ">=6.0.0" },
-    { name = "yoker", editable = "../yoker" },
+    { name = "yoker" },
 ]
 provides-extras = ["docs", "dev"]
 
