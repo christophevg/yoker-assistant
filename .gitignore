@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+
+# Testing
+.coverage
+.coverage.*
+htmlcov/
+
+# Type checking & linting caches
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.tox/
+
+# Logs
+*.log
+
+# Environment (track .env.example, ignore real .env)
+.env
+
+# OS
+.DS_Store
