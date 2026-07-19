@@ -11,7 +11,7 @@ new bounded tools remain Phase B and are deliberately absent.
 
 ### P1 — Bootstrap & project skeleton
 
-- [ ] **P1-001: Initialize uv Python project structure**
+- [x] **P1-001: Initialize uv Python project structure** ✅ (2026-07-19, PR #1)
   - Create `pyproject.toml` (uv-managed) with package metadata, Python
     version, and the standard Makefile targets per `c3:python-project`
     (build, check, clean, env-dev, env-run, format, help, lint, pre-publish,
