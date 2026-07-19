@@ -147,20 +147,30 @@ dual-mode. The clean code shape:
   the manifest and import tool functions — NO `Agent` construction or
   loop logic there (that lives in `__main__`/`loop`/`agent` modules).
   This discipline avoids any circular import.
-- Register the package in its OWN `yoker.toml`:
+- The user adds the plugin registration to their `~/.yoker.toml`:
   `[plugins] enabled = true; packages = ["yoker_assistant", "pkgq"]`
   and `[plugins.trusted] yoker_assistant = true; pkgq = true`.
   Self-trust is REQUIRED for unattended operation: with no TTY to
   prompt, the trust gate rejects untrusted plugins in non-interactive
-  mode.
+  mode. The package documents this requirement (and ships a
+  `yoker.toml.example` as reference documentation). Self-registration
+  via a repo-level `yoker.toml` does NOT work for the primary `uvx`
+  deployment model: yoker resolves project config from the current
+  working directory (`./yoker.toml`) and the user's home
+  (`~/.yoker.toml`), NOT from the package install location — so when
+  run via `uvx yoker-assistant`, a `yoker.toml` inside the installed
+  package is never read. A repo-level `yoker.toml` is only read during
+  local dev (when the cwd is the checkout) and there it clobbers the
+  user's backend/model config. The user's `~/.yoker.toml` is the
+  correct location for plugin registration.
 - The `Agent` is constructed normally
   (`Agent(agent_path="agents/assistant.md")`); plugins load from
-  `yoker.toml` automatically. No `plugins=()` arg is needed.
+  `~/.yoker.toml` automatically. No `plugins=()` arg is needed.
 - External consumers load yoker-assistant's tools the IDENTICAL way:
   `pip install yoker-assistant` plus the same `[plugins]` /
-  `[plugins.trusted]` lines in their `yoker.toml`. Self-consumption and
-  third-party consumption use the same mechanism — this is the elegant
-  showcase point.
+  `[plugins.trusted]` lines in their `~/.yoker.toml`. Self-consumption
+  and third-party consumption use the same mechanism — this is the
+  elegant showcase point.
 - The agent definition's `tools:` frontmatter declares
   `yoker_assistant:md_to_html` (full namespace for a plugin tool),
   which resolves to the tool registered by the plugin loader.
@@ -168,7 +178,7 @@ dual-mode. The clean code shape:
 This adds a THIRD layer to the demo: (1) consumer of yoker's built-in
 curated tools, (2) provider of its own named safe tool, (3) reusable —
 any yoker consumer can load the tool. Minimal cost: one manifest
-declaration plus three lines in `yoker.toml`.
+declaration plus three lines in the user's `~/.yoker.toml`.
 
 ### 2.4 The simple-email-gw seam
 
@@ -281,8 +291,8 @@ After the port, the assistant's curated tool set is:
 - `yoker_assistant:md_to_html` — a **custom local tool** defined in THIS
   package as a yoker plugin (see §2.3.1). Defined in
   `src/yoker_assistant/tools.py`, exposed via `__YOKER_MANIFEST__` in
-  `src/yoker_assistant/__init__.py`, and registered via the package's own
-  `yoker.toml [plugins]` (NOT programmatic). Converts the agent's markdown
+  `src/yoker_assistant/__init__.py`, and registered via the user's
+  `~/.yoker.toml [plugins]` (NOT programmatic). Converts the agent's markdown
   reply to HTML for email rendering. This is the showcase's "create your
   own bounded tool" example and pairs with the built-in curated tools above
   to demonstrate both halves of yoker's tool model: using yoker's built-ins
@@ -483,11 +493,23 @@ Three configuration concerns, kept separate (no bleeding):
 - Loop parameters: `poll_interval` (seconds, default 60), `archive_folder`
   (default `Archive`), `inbox_folder` (default `INBOX`).
 
-### 5.2 yoker (`yoker.toml`)
+### 5.2 yoker (`~/.yoker.toml`)
+
+The backend, model, and permissions live in the user's `~/.yoker.toml`,
+created by yoker's bootstrap. The `[plugins]` / `[plugins.trusted]` lines
+also live there — that is the correct location for plugin registration
+because yoker resolves project config from `~/.yoker.toml` (user) and
+`./yoker.toml` (cwd), NOT from the package install location. A repo-level
+`yoker.toml` is only read during local dev (when the cwd is the checkout)
+and would clobber the user's backend config there. The package provides a
+`yoker.toml.example` as documentation only — reference for the lines the
+user must add to their `~/.yoker.toml`, not a checked-in active config.
 
 - Backend + model (provider, base_url, api_key, model, parameters).
 - Permissions (`filesystem_paths`, `network_access`, tool enablement).
-- Plugins: `[plugins] enabled = true; packages = ["pkgq"]; trusted = { pkgq = true }`.
+- Plugins: `[plugins] enabled = true; packages = ["yoker_assistant", "pkgq"]`
+  and `[plugins.trusted] yoker_assistant = true; pkgq = true` (self-trust
+  required for unattended operation).
 - Skills directory (`skills.directories = ["./skills"]`).
 - Agents directory (optional; the agent is loaded by explicit path).
 
@@ -608,9 +630,15 @@ still needs owner confirmation.
 12. **Dual-mode / plugin registration.** RESOLVED: yoker-assistant is
     dual-mode — both a yoker SDK consumer and a yoker plugin provider.
     The package exposes `__YOKER_MANIFEST__` in `src/yoker_assistant/__init__.py`
-    (manifest only; no `Agent` construction there) and registers itself in
-    its own `yoker.toml [plugins]` with self-trust (`[plugins.trusted]
-    yoker_assistant = true`, required for unattended operation). See
+    (manifest only; no `Agent` construction there). Self-trust is configured
+    in the user's global `~/.yoker.toml` (`[plugins] enabled = true;
+    packages = ["yoker_assistant", "pkgq"]` and `[plugins.trusted]
+    yoker_assistant = true; pkgq = true`, required for unattended
+    operation) — NOT in a repo-level `yoker.toml`. yoker resolves project
+    config from `cwd` and `~`, not the package install location, so a
+    repo-level `yoker.toml` is only read during local dev and would
+    clobber the user's backend config there. The package documents the
+    required lines and ships a `yoker.toml.example` as reference. See
     §2.3.1 for the full pattern.
 
 13. **Session-setup mechanism.** RESOLVED: one-time initialize message
@@ -626,8 +654,8 @@ one package: a **consumer** of yoker's built-in curated tools
 (`yoker:read`, `yoker:git`, …), a **provider** of its own named safe tool
 (`yoker_assistant:md_to_html`), and a **reusable plugin** that any external
 yoker consumer can load with `pip install yoker-assistant` plus the same
-two `yoker.toml` lines. Self-consumption and third-party consumption use
-the identical mechanism.
+two `[plugins]` / `[plugins.trusted]` lines in their `~/.yoker.toml`.
+Self-consumption and third-party consumption use the identical mechanism.
 
 ## 9. Requirements Coverage (informal)
 

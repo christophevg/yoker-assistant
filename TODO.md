@@ -27,16 +27,21 @@ new bounded tools remain Phase B and are deliberately absent.
   - Depend on `yoker` (local path or PyPI), `simple-email-gw`, and `pkgq`
     (plugin). Document local-path wiring for development
     (`../yoker`, `../simple-email-gw`).
-  - Add a `yoker.toml` skeleton: backend, model, permissions
-    (`filesystem_paths`, `network_access`), `[plugins] enabled = true;
-    packages = ["yoker_assistant", "pkgq"]` and `[plugins.trusted]
+  - Document the required user config in `~/.yoker.toml`: `[plugins] enabled
+    = true; packages = ["yoker_assistant", "pkgq"]` and `[plugins.trusted]
     yoker_assistant = true; pkgq = true` (self-trust is REQUIRED for
     unattended operation — with no TTY to prompt, the trust gate rejects
     untrusted plugins in non-interactive mode), `skills.directories =
-    ["./skills"]`.
+    ["./skills"]`. Provide a `yoker.toml.example` as reference documentation
+    (not a checked-in active config). yoker resolves config from `~/.yoker.toml`
+    (user) and `./yoker.toml` (cwd), NOT from the package install location —
+    so a repo-level `yoker.toml` is only read during local dev and would
+    clobber the user's backend config. The user's `~/.yoker.toml` is the
+    correct location for plugin registration.
   - Add `.env.example` for email account config.
-  - **Acceptance:** `make env-dev` resolves all deps; a smoke `python -m
-    yoker` loads `yoker.toml` without error; both plugins load trusted.
+  - **Acceptance:** `make env-dev` resolves all deps; the README documents
+    the required `~/.yoker.toml` lines; a `yoker.toml.example` is provided
+    as reference.
   - **Satisfies:** bootstrap
 
 ### P1 — simple-email-gw integration
