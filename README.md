@@ -23,7 +23,10 @@ python -m yoker_assistant   # entry point stub (exits cleanly until wired)
 
 Configuration:
 
-- `yoker.toml` — backend, model, permissions, plugins, skills.
+- The user's `~/.yoker.toml` — backend, model, permissions, plugins, skills
+  (yoker resolves config from `~/.yoker.toml` and `./yoker.toml`, not from the
+  package install location). A `yoker.toml.example` in this repo documents the
+  required lines; it is reference documentation, not an active config.
 - `.env` (from `.env.example`) — email account credentials via simple-email-gw.
 
 ## License
