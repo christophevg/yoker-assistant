@@ -1,0 +1,48 @@
+# ============================================================================
+# REFERENCE ONLY — DO NOT USE AS-IS.
+#
+# This file documents the lines you must add to ~/.yoker.toml (your USER
+# config). yoker resolves project config from ~/.yoker.toml (user) and
+# ./yoker.toml (cwd), NOT from the package install location. A repo-level
+# ./yoker.toml is only read during local dev (when the cwd is the checkout)
+# and WILL CLOBBER your user backend/model config if you copy this file
+# there. Do NOT copy this file to ./yoker.toml. Do NOT commit a filled-in
+# copy. The correct location for plugin registration is ~/.yoker.toml.
+#
+# Self-trust blast radius: marking [plugins.trusted] yoker_assistant = true
+# (and pkgq = true) admits ALL tool code from those packages as trusted
+# with no per-call gate. Pin the installed versions
+# (`uv pip install yoker-assistant==<version>`) and verify the source.
+# ============================================================================
+
+# -- Plugins (yoker-assistant + pkgq) ----------------------------------------
+# Required for unattended operation: with no TTY to prompt, yoker's trust
+# gate rejects untrusted plugins in non-interactive mode, so both packages
+# must be listed and trusted here.
+
+[plugins]
+enabled = true
+packages = ["yoker_assistant", "pkgq"]
+
+[plugins.trusted]
+yoker_assistant = true
+pkgq = true
+
+# -- Skills ------------------------------------------------------------------
+# Directory holding the ported pa-inbox / pa-outbox SKILL.md files. Relative
+# to the cwd yoker is launched from.
+
+[skills]
+directories = ["./skills"]
+
+# -- Backend / model (placeholder) -------------------------------------------
+# These lines belong in ~/.yoker.toml alongside the [plugins] block above.
+# The example shows a local Ollama backend with no API key (the same shape
+# as the previously-removed repo-level yoker.toml). For a cloud provider,
+# set `api_key` to the secret value — and NEVER commit it.
+
+[backend]
+type = "ollama"
+base_url = "http://localhost:11434"
+model = "qwen3"
+# api_key = "REDACTED"  # set only for cloud providers, in ~/.yoker.toml

@@ -23,5 +23,10 @@ htmlcov/
 # Environment (track .env.example, ignore real .env)
 .env
 
+# yoker runtime config — must not be committed (may contain api_key).
+# Only the example reference file is tracked.
+yoker.toml
+!yoker.toml.example
+
 # OS
 .DS_Store
