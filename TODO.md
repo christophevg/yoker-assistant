@@ -61,66 +61,48 @@ new bounded tools remain Phase B and are deliberately absent.
 
 ### P1 — simple-email-gw integration
 
-- [ ] **P1-003: Implement the mailbox seam module**
-  - Create `yoker_assistant/mailbox.py` wrapping `simple_email_gw`'s async
-    `IMAPClient`/`SMTPClient`. Expose a small, typed surface:
-    `Mailbox(account)` with `connect()`, `unread_ids()`, `fetch(id)`,
-    `reply(to, subject, html_body, in_reply_to, *, text_body='')`,
-    `mark_read(id)`, `archive(id)`, `close()`.
-  - No business logic here — pure seam. Configuration via `EmailAccount` from
-    env/`.env`.
-  - **Scope/contract (cross-domain review consensus):**
-    - Mailbox is a thin async seam, long-lived: construct once, `await
-      connect()` once, `await close()` on shutdown; implements
-      `__aenter__`/`__aexit__`. Holds one IMAPClient + one SMTPClient.
-      simple_email_gw 0.3.0 clients are NOT async context managers
-      themselves.
-    - `fetch()` returns a typed `EmailMessage` dataclass (frozen, slots) with
-      fields: `id`, `subject`, `from_`, `to`, `date`, `body` (plain text),
-      `message_id` (RFC Message-ID; `''` if absent), `references`
-      (tuple[str,...]), `read`. This is the shared contract for P2-006
-      (handoff builder) and P3-003 (tests).
-    - `reply(to, subject, html_body, in_reply_to, *, text_body='')` — the
-      HTML parameter is named `html_body` to make routing to
-      simple_email_gw's `html_body=` explicit. `text_body` is the optional
-      plain-text alternative (intentionally empty in the first pass;
-      accessibility polish deferred).
-    - Constructor: `Mailbox(account, *, inbox_folder='INBOX',
-      archive_folder='Archive', imap_client=None, smtp_client=None)`. The
-      `imap_client`/`smtp_client` kwargs are for P3-003 dependency-injected
-      stubs.
-    - The seam does NOT swallow or retry connection/send failures — it
-      propagates exceptions from simple_email_gw so the loop's §7
-      backoff/skip policy handles them.
-    - The seam constructs `EmailAccount` via simple_email_gw's
-      `ServerConfig`/`get_accounts()` (inherits TLS 1.2+ with cert
-      verification; refuse/loudly warn on plaintext-credential configs).
-    - The seam does NOT reinvent the recipient allowlist — reply sending
-      delegates to simple_email_gw which enforces
-      `EMAIL_RECIPIENT_WHITELIST_ADDRESSES`.
-    - The seam must NOT call `get_secret_value()` outside gateway calls;
-      `EmailAccount.password` is a pydantic `SecretStr`;
-      `Mailbox.__repr__` redacts credentials.
-    - Logging posture: INFO counts/events only (e.g. "fetched N unseen");
-      never message bodies, credentials, or full headers.
-  - **Acceptance:** module imports; each method delegates to exactly one
-    `simple_email_gw` call, except `reply()` which branches between
-    `reply_email` and `send_email` on `in_reply_to` presence (transport
-    routing, not business logic); no inline agent/reasoning logic.
-  - **Blocking acceptance checks (cross-domain review):**
-    - `reply()` routes the agent's HTML through simple_email_gw's
-      `html_body=` parameter (not `body=`), so the reply renders as HTML in
-      the recipient's client.
-    - At startup (seam or loop init), assert
-      `get_recipient_whitelist().enabled is True` and non-empty — fail
-      closed for unattended operation (no silent reply-to-arbitrary-senders).
-  - **P1-002 errata (lands alongside P1-003):** rename
-    `EMAIL_RECIPIENT_ADDRESSES` →
-    `EMAIL_RECIPIENT_WHITELIST_ADDRESSES` in `.env.example` and `README.md`
-    (the documented env var name was wrong; simple_email_gw binds
-    `EMAIL_RECIPIENT_WHITELIST_ADDRESSES`, and the wrong name silently
-    disables the whitelist).
-  - **Satisfies:** simple-email-gw seam
+- [ ] **P1-003: P1-002 errata + functional.md corrections**
+  - **DESCOPED.** The original P1-003 scope (a `Mailbox` wrapper class over
+    `simple_email_gw`'s async `IMAPClient`/`SMTPClient`) was descoped per
+    owner feedback — wrapping two existing classes in a thin indirection
+    class added no benefit for a demo/tutorial. The loop (P2-005) calls
+    `simple_email_gw` directly (constructs `IMAPClient(account)` +
+    `SMTPClient(account)`, `await imap.connect()` once, polls, fetches,
+    replies via `smtp.reply_email(...)`, marks read, archives,
+    `await imap.disconnect()` on shutdown). No `mailbox.py`, no seam
+    methods, no `__aenter__`/`__aexit__`, no `connect()`/`close()` on a
+    wrapper object.
+  - The task is now ONLY the errata fixes landed alongside the descope:
+    - **P1-002 errata:** rename `EMAIL_RECIPIENT_ADDRESSES` →
+      `EMAIL_RECIPIENT_WHITELIST_ADDRESSES` in `.env.example` and `README.md`
+      (the documented env var name was wrong; `simple_email_gw` binds
+      `EMAIL_RECIPIENT_WHITELIST_ADDRESSES`, and the wrong name silently
+      disables the whitelist).
+    - **functional.md corrections:** §2.2 (the seam is the loop module
+      itself, not a wrapper class), §2.4 (no `Mailbox` wrapper; the loop
+      calls `IMAPClient`/`SMTPClient` directly with explicit
+      `connect()`/`disconnect()`; the errata about `simple_email_gw` 0.3.0
+      clients not being async context managers stays), §4.3 (every send is
+      a reply — always `reply_email`, no `send_email` fallback; reply sent
+      only if the agent produced a non-empty reply body; `html_body=`
+      routing clarification retained), §4.4 (the ordering is owned by the
+      loop, not a `Mailbox` seam).
+  - **Note (original scope, retained for the historical record):** the
+    cross-domain review consensus design was a `Mailbox` class with
+    `connect()`/`unread_ids()`/`fetch()`/`reply()`/`mark_read()`/`archive()`/`close()`,
+    a typed `EmailMessage` dataclass, and a `reply()` that branched between
+    `reply_email` and `send_email` on `in_reply_to` presence. The owner
+    challenged this during PR review ("Why wrap two existing classes in
+    another class with no added benefit?" / "How can the reply ever not be
+    a reply?") and the consensus was descoped to errata only. See
+    `reporting/p1-003/consensus.md` for the descope update and the
+    original consensus design.
+  - **Acceptance:** `.env.example` and `README.md` use
+    `EMAIL_RECIPIENT_WHITELIST_ADDRESSES`; `analysis/functional.md` §2.2,
+    §2.4, §4.3, and §4.4 reflect the descope (no `Mailbox` class; every
+    send is `reply_email`; the loop owns the ordering and the
+    gateway-lifecycle calls); no `mailbox.py` is created.
+  - **Satisfies:** simple-email-gw integration (errata only)
 
 ### P1 — yoker SDK integration
 
@@ -261,26 +243,54 @@ new bounded tools remain Phase B and are deliberately absent.
 
 - [ ] **P2-005: Implement the main loop**
   - Create `yoker_assistant/__main__.py` (and `loop.py` if separated):
-    - `async def run()`: build `EmailAccount`, `Mailbox`, `Assistant`; run
-      the one-time session-setup step (`Assistant.setup()` — send an
-      initialize message to the session so the agent reads `PERSONAL.md`
-      via `yoker:read` and initializes identity on the first turn); then
-      enter the loop: `unread_ids()` → for each: `fetch` → `agent.process`
-      (next message in the SAME session) → `reply` → `mark_read` →
-      `archive`; sleep `poll_interval`; repeat.
+    - `async def run()`: build `EmailAccount`, the `Assistant` (constructed
+      ONCE with a persistent context manager), and the `simple_email_gw`
+      clients directly — `imap = IMAPClient(account)`,
+      `smtp = SMTPClient(account)`. Run the one-time session-setup step
+      (`Assistant.setup()` — send an initialize message to the session so
+      the agent reads `PERSONAL.md` via `yoker:read` and initializes
+      identity on the first turn); then `await imap.connect()` once and
+      enter the loop.
+    - Per iteration: `await imap.search(folder="INBOX", criteria="UNSEEN")`
+      → for each id: `await imap.fetch_message(...)` → build the handoff
+      payload (P2-006) → `reply_html = await agent.process(message)` (next
+      message in the SAME session) → if `reply_html` is non-empty, send the
+      reply via `await smtp.reply_email(to=sender,
+      subject=f"Re: {subject}", html_body=reply_html,
+      in_reply_to=msg["message_id"])` → `await imap.mark_message(...,
+      "\\Seen", "add")` → `await imap.move_message(..., "Archive")`.
+    - **Every send is a reply** — always `smtp.reply_email(...)`; there is
+      no `send_email` fallback. The `Re:` subject string and the
+      `in_reply_to=msg["message_id"]` passthrough are loop-side
+      one-liners. The `html_body=` kwarg name is the loop's responsibility
+      (it routes the agent's HTML through `simple_email_gw`'s HTML
+      content-type path); the loop does NOT construct MIME itself.
+    - If the agent returns an empty reply body, the loop SKIPS the send
+      (and the message-handling decision in that case — whether to mark
+      read, archive, or retry — is a loop concern, see §4.3/§7).
+    - **No `Mailbox` object.** The loop owns the gateway lifecycle
+      explicitly: `await imap.connect()` once at startup,
+      `await imap.disconnect()` on shutdown; `smtp.connect()`/`smtp.disconnect()`
+      around the send (or once for the loop's lifetime — implementation
+      choice). The ordering (send → mark read → archive) lives in the loop
+      (§4.4), not in a seam object.
     - The `Agent` is constructed ONCE at startup with a persistent context
       manager; the loop delivers each email as the next user message to that
       session. Do NOT construct a fresh Agent per email.
     - `--once` flag: process one iteration and exit.
     - Graceful shutdown on `SIGINT`/`SIGTERM`: finish in-flight message,
-      close connections, exit 0.
+      `await imap.disconnect()` (and `smtp.disconnect()` if held open),
+      exit 0.
     - Error handling per §7 of the analysis: connection failure backs off;
       agent/send failure does not mark read; per-message exceptions skip and
       continue.
   - **Acceptance:** `python -m yoker_assistant --once` runs one poll and exits
     cleanly on an empty inbox; a seeded unread email produces a reply (with a
-    live backend) and is marked read + archived; a second email in a
-    subsequent iteration sees the first email's context (persistent session).
+    live backend) and is marked read + archived; the reply is sent via
+    `smtp.reply_email(..., html_body=reply_html, in_reply_to=msg["message_id"])`
+    (not `send_email`, not `body=`); when the agent produces no reply body,
+    no send is attempted; a second email in a subsequent iteration sees the
+    first email's context (persistent session).
   - **Satisfies:** the loop
 
 ### P2 — The handoff contract
@@ -292,13 +302,13 @@ new bounded tools remain Phase B and are deliberately absent.
     (system prompt) and the one-time session-setup step, not in the per-email
     payload. Pure function, no I/O.
   - **Scope update (post-P1-003 functional-analyst review):** the slim P1-003
-    implementation dropped the `EmailMessage` dataclass — `Mailbox.fetch()`
-    returns the raw `simple_email_gw` message dict directly. `build_message`
-    therefore accepts the raw `simple_email_gw` message dict (not an
-    `EmailMessage` dataclass) and reads the fields it needs directly from
-    the dict (e.g. `msg["subject"]`, `msg["from"]`, `msg["date"]`,
-    `msg["body"]`). Reference the `simple_email_gw` `fetch_message` dict
-    shape as the shared contract.
+    implementation dropped the `EmailMessage` dataclass — the loop's
+    `await imap.fetch_message(id, folder="INBOX")` returns the raw
+    `simple_email_gw` message dict directly. `build_message` therefore
+    accepts the raw `simple_email_gw` message dict (not an `EmailMessage`
+    dataclass) and reads the fields it needs directly from the dict (e.g.
+    `msg["subject"]`, `msg["from"]`, `msg["date"]`, `msg["body"]`). Reference
+    the `simple_email_gw` `fetch_message` dict shape as the shared contract.
   - The session-setup step (agent reads `PERSONAL.md` and initializes) is run
     once at startup in the loop (P2-005), not here.
   - **Acceptance:** given a fetched `simple_email_gw` message dict, returns
@@ -307,33 +317,24 @@ new bounded tools remain Phase B and are deliberately absent.
     shape.
   - **Satisfies:** handoff contract
 
-- [ ] **P2-007: Wire reply sending with correct threading (HTML)**
-  - **Scope update (post-P1-003 api-architect review):** the slim P1-003
-    `Mailbox.reply()` method already folds both transport paths internally
-    (`in_reply_to` present → `reply_email`; `in_reply_to=None` →
-    `send_email`). P2-007 therefore does NOT add a new `Mailbox.send()`
-    method — the loop-side logic is the remaining job:
-    - When the fetched message has no RFC Message-ID (or it is absent),
-      construct the `Re: <original subject>` subject string in the loop and
-      pass `in_reply_to=None` so `Mailbox.reply()` routes to `send_email`.
-    - When the fetched message carries an RFC Message-ID, pass it through
-      as `in_reply_to` so `Mailbox.reply()` routes to `reply_email` and
-      threading is preserved.
-    - Send the agent's HTML output verbatim as `html_body=` (the slim
-      `Mailbox.reply()` already forwards `html_body=` to the gateway); do
-      not re-render or mutate the HTML.
-  - The body is **HTML** — the agent's `md_to_html`-converted output
-    (returned by `agent.process()`). Set the appropriate content type for
-    HTML; send the HTML verbatim, do not re-render.
-  - Recipient safety is a `simple-email-gw` config concern
-    (`EMAIL_RECIPIENT_WHITELIST_ADDRESSES`), not package code. No
-    package-level allowlist is written; document the gateway config in the
-    README.
-  - **Acceptance:** replies thread correctly in a mail client and render as
-    HTML; the reply body is the agent's HTML output verbatim; the loop
-    chooses `in_reply_to` vs `None` correctly per the fetched message's
-    Message-ID presence.
-  - **Satisfies:** handoff contract
+- [ ] **P2-007: Wire reply sending with correct threading (HTML)** —
+  FOLDED INTO P2-005
+  - **No remaining scope.** The reply sending is a single
+    `smtp.reply_email(...)` call in the loop (P2-005). The `Re:` subject
+    string and the `in_reply_to=msg["message_id"]` passthrough are
+    loop-side one-liners already specified in P2-005. The `send_email`
+    fallback has been dropped — every send is a reply (always
+    `reply_email`). The `html_body=` routing is a loop concern (kwarg
+    name), also specified in P2-005.
+  - **Original scope (retained for the historical record):** wire
+    `Mailbox.reply()` with the `in_reply_to` branch (`reply_email` vs
+    `send_email` fallback) and the `html_body=` forwarding. That branch and
+    the `Mailbox` seam were descoped per owner feedback; the loop now does
+    the single `reply_email` call directly.
+  - **Acceptance:** covered by P2-005's acceptance criteria (the loop
+    sends via `smtp.reply_email(..., html_body=reply_html,
+    in_reply_to=msg["message_id"])`).
+  - **Satisfies:** handoff contract (folded into P2-005)
 
 ### P3 — Tests
 
@@ -346,39 +347,33 @@ new bounded tools remain Phase B and are deliberately absent.
   - **Satisfies:** tests (handoff)
 
 - [ ] **P3-002: Tests for the polling logic**
-  - `tests/test_loop.py`: with a fake `Mailbox` (no network) and a fake
-    `Assistant` (no backend), assert the loop: fetches unseen, calls
-    `process`, sends reply, marks read, archives, in order; on empty inbox
-    sleeps and does not error; on agent failure does not mark read; on send
-    failure does not archive.
-  - **Acceptance:** `make test` passes; behavior-based, no real IMAP/LLM.
-  - **Satisfies:** tests (polling)
+  - `tests/test_loop.py`: with fake `IMAPClient`/`SMTPClient` stubs (no
+    network) and a fake `Assistant` (no backend), assert the loop:
+    fetches unseen, calls `process`, sends the reply via
+    `smtp.reply_email(..., html_body=<agent output>, in_reply_to=msg["message_id"])`
+    (NOT `body=`, NOT `send_email`), marks read, archives, in order;
+    on empty inbox sleeps and does not error; on agent failure does not
+    mark read; on send failure does not archive; **and when the agent
+    returns an empty reply body, the loop skips the send entirely** (no
+    `reply_email` call, no mark-read, per §4.3).
+  - **html_body= routing regression test (absorbed from the descoped
+    P1-003 `test_mailbox.py`):** P3-002 MUST assert the loop calls
+    `smtp.reply_email` with `html_body=<agent output>` (not `body=`), so
+    the reply renders as HTML in the recipient's client. This is the
+    regression test that guarded the `html_body=` routing when the
+    `Mailbox` seam existed; with the seam descoped, the routing is a
+    loop-side concern and the test lives here.
+  - **Acceptance:** `make test` passes; behavior-based, no real
+    IMAP/LLM; the `html_body=` routing is asserted at the loop→gateway
+    boundary; the skip-on-empty-reply-body behaviour is asserted.
+  - **Satisfies:** tests (polling + html_body= routing)
 
-- [ ] **P3-003: Tests for the mailbox seam**
-  - `tests/test_mailbox.py`: a small integration test against
-    `simple_email_gw`'s public surface — assert the seam methods map to the
-    expected client calls (use a stub/spool or a documented test account if
-    `simple-email-gw` provides one). Keep it useful, not exhaustive.
-  - **Scope update (post-P1-003 testing-engineer review):** the slim P1-003
-    implementation dropped the `imap_client`/`smtp_client` DI kwargs from
-    `Mailbox.__init__` — the slim seam is constructed as `Mailbox(account)`
-    with no injection surface. P3-003 must therefore decide its approach:
-    either (a) reintroduce a minimal DI surface (e.g. optional
-    `imap_client=`/`smtp_client=` kwargs) to keep the original DI-style
-    acceptance, or (b) use monkeypatching against the constructed
-    `Mailbox`'s `self._imap`/`self._smtp` attributes. The choice is left to
-    P3-003; the slim P1-003 deliberately does NOT expose DI kwargs.
-  - **html_body= routing regression test (testing-engineer recommendation,
-    blocking P2-007 live replies):** P3-003 MUST include a regression test
-    asserting `Mailbox.reply(..., html_body=...)` forwards `html_body=` to
-    the underlying gateway call (both `reply_email` when `in_reply_to` is
-    set and `send_email` when it is `None`) — never `body=`. A small version
-    of this test is being added in P1-003 itself; P3-003 should expand it
-    (cover both routing branches and the `text_body=''` default).
-  - **Acceptance:** `make test` passes; the seam is exercised, not just
-    imported; the `html_body=` routing regression test covers both
-    `in_reply_to` branches.
-  - **Satisfies:** tests (mailbox seam)
+- [ ] ~~**P3-003: Tests for the mailbox seam**~~ — DROPPED
+  - **Dropped — P1-003's `Mailbox` seam was descoped.** There is no seam
+    module to test. The `html_body=` routing regression test that lived
+    in the descoped `test_mailbox.py` has been absorbed into P3-002
+    (loop tests), where the loop→gateway boundary is now exercised
+    directly.
 
 ### P3 — Security (defense in depth)
 

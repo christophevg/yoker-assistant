@@ -7,7 +7,7 @@ consumer, including itself.
 
 This module is import-safe: importing it must NOT trigger any Agent
 construction, email logic, or loop logic. Those live in ``__main__``,
-``loop``, ``agent``, and ``mailbox``. The manifest only declares tool
+``loop``, and ``agent``. The manifest only declares tool
 functions — no side effects at import time.
 """
 
