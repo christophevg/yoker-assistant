@@ -196,9 +196,11 @@ account = EmailAccount(name="default", imap_host=..., smtp_host=...,
 
 # simple_email_gw 0.3.0 IMAPClient/SMTPClient do NOT implement
 # __aenter__/__aexit__; they expose explicit connect()/disconnect() methods.
-# The Mailbox seam (P1-003) wraps them as a long-lived async context manager
-# (Mailbox implements __aenter__/__aexit__ itself; construct once, await
-# connect() once, await close() on shutdown).
+# The Mailbox seam (P1-003) wraps them as a long-lived seam with explicit
+# async connect()/close() methods (construct once, await connect() once,
+# await close() on shutdown). The slim P1-003 implementation does NOT
+# implement __aenter__/__aexit__; the loop owns the Mailbox lifecycle via
+# explicit calls. This is a slimness decision per the owner's directive.
 imap = IMAPClient(account)
 await imap.connect()
 try:
@@ -222,10 +224,12 @@ finally:
 **Errata (P1-003 cross-domain review):** an earlier version of this section
 showed `async with IMAPClient(account) as imap:`. That is inaccurate —
 simple_email_gw 0.3.0 `IMAPClient`/`SMTPClient` are NOT async context
-managers. The `Mailbox` seam provides its own `__aenter__`/`__aexit__`
-wrapping the long-lived clients (construct once, `await connect()` once,
-`await close()` on shutdown). The method signatures and behaviour described
-below remain correct.
+managers. The slim `Mailbox` seam exposes explicit `async connect()`/`async
+close()` methods and does NOT implement the async context-manager protocol;
+the loop calls them directly (construct once, `await connect()` once, `await
+close()` on shutdown). This is a slimness decision per the owner's directive
+— dropping `__aenter__`/`__aexit__` was sanctioned by the owner's slimness
+steer. The method signatures and behaviour described below remain correct.
 
 `EmailAccount` fields: `name`, `imap_host`, `smtp_host`, `username`,
 `password`. Configuration can come from env vars
