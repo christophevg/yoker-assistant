@@ -88,6 +88,13 @@ in the persistent session (yoker's context manager) plus memory files and
 - No agent cost is spent on structured work (it never polls, never touches
   IMAP/SMTP). No Python is spent on reasoning (Python does not interpret the
   email body).
+- **The seam between the two halves is the loop module itself** — the
+  conceptual boundary where the structured work (Python) hands off to the
+  reasoning work (the agent) and back. There is NO `Mailbox` wrapper class
+  indirection layer: the loop calls `simple_email_gw`'s `IMAPClient` and
+  `SMTPClient` directly (see §2.4). An earlier design proposed a `Mailbox`
+  seam class; it was descoped per owner feedback (wrapping two existing
+  classes in a third class added no benefit for a demo/tutorial).
 
 ### 2.3 The yoker SDK seam
 
@@ -196,11 +203,9 @@ account = EmailAccount(name="default", imap_host=..., smtp_host=...,
 
 # simple_email_gw 0.3.0 IMAPClient/SMTPClient do NOT implement
 # __aenter__/__aexit__; they expose explicit connect()/disconnect() methods.
-# The Mailbox seam (P1-003) wraps them as a long-lived seam with explicit
-# async connect()/close() methods (construct once, await connect() once,
-# await close() on shutdown). The slim P1-003 implementation does NOT
-# implement __aenter__/__aexit__; the loop owns the Mailbox lifecycle via
-# explicit calls. This is a slimness decision per the owner's directive.
+# The loop (P2-005) calls them directly: construct once, `await connect()`
+# once, `await disconnect()` on shutdown. No wrapper class, no indirection
+# layer — the loop owns the gateway lifecycle explicitly.
 imap = IMAPClient(account)
 await imap.connect()
 try:
@@ -215,8 +220,9 @@ finally:
 smtp = SMTPClient(account)
 await smtp.connect()
 try:
-    await smtp.send_email(to=[sender], subject=f"Re: {subject}", body=reply)
-    # or smtp.reply_email(to=sender, subject=..., html_body=..., in_reply_to=msg_id)
+    # Every send is a reply — always reply_email (no send_email fallback).
+    await smtp.reply_email(to=[sender], subject=f"Re: {subject}",
+                           html_body=reply_html, in_reply_to=msg_id)
 finally:
     await smtp.disconnect()
 ```
@@ -224,21 +230,24 @@ finally:
 **Errata (P1-003 cross-domain review):** an earlier version of this section
 showed `async with IMAPClient(account) as imap:`. That is inaccurate —
 simple_email_gw 0.3.0 `IMAPClient`/`SMTPClient` are NOT async context
-managers. The slim `Mailbox` seam exposes explicit `async connect()`/`async
-close()` methods and does NOT implement the async context-manager protocol;
-the loop calls them directly (construct once, `await connect()` once, `await
-close()` on shutdown). This is a slimness decision per the owner's directive
-— dropping `__aenter__`/`__aexit__` was sanctioned by the owner's slimness
-steer. The method signatures and behaviour described below remain correct.
+managers; they expose explicit `connect()`/`disconnect()` methods. The loop
+calls those methods directly (construct once, `await imap.connect()` once,
+`await imap.disconnect()` on shutdown). There is NO `Mailbox` wrapper class
+and no seam object with `__aenter__`/`__aexit__` or `connect()`/`close()`
+methods — an earlier design proposed one, but it was descoped per owner
+feedback (wrapping two existing classes in a third class added no benefit
+for a demo/tutorial). The method signatures and behaviour described below
+remain correct.
 
 `EmailAccount` fields: `name`, `imap_host`, `smtp_host`, `username`,
 `password`. Configuration can come from env vars
 (`EMAIL_IMAP_HOST`, `EMAIL_SMTP_HOST`, `EMAIL_USERNAME`, `EMAIL_PASSWORD`) or
 a multi-account JSON (`EMAIL_ACCOUNTS_JSON`).
 
-**Seam decision (confirmed):** async `IMAPClient`/`SMTPClient` inside yoker's
-async loop. This avoids running two event loops (yoker's + the sync wrapper's
-background thread) and is the clean fit for an async-native SDK.
+**Seam decision (confirmed):** async `IMAPClient`/`SMTPClient` called
+directly from yoker's async loop. This avoids running two event loops
+(yoker's + the sync wrapper's background thread) and is the clean fit for an
+async-native SDK.
 
 ## 3. The c3 → yoker-assistant Porting Map
 
@@ -473,16 +482,21 @@ render well together, so the reply is HTML end-to-end.
 
 1. Capture `reply_html = await agent.process(message)` (the agent has
    already converted markdown → HTML via its tool).
-2. Send via `SMTPClient.reply_email(to=sender, subject=f"Re: {subject}",
-   html_body=reply_html, in_reply_to=message_id)` (threading preserved) — or
-   `send_email` if only the MCP-style id is available (the async client's
-   `fetch_message` returns the RFC Message-ID header, so `reply_email` is
-   usable). The body is HTML; set the appropriate content type for HTML.
-   **Clarification (P1-003 cross-domain review):** `reply_email`/`send_email`
-   set the HTML content type when `html_body` is passed; the Mailbox seam
-   forwards the agent's HTML as `html_body=` (not `body=`) and does NOT
-   construct MIME itself. The plain-text alternative (`text_body=`) is
-   intentionally empty in the first pass; accessibility polish is deferred.
+2. If `reply_html` is non-empty, send it via
+   `SMTPClient.reply_email(to=sender, subject=f"Re: {subject}",
+   html_body=reply_html, in_reply_to=message_id)` (threading preserved).
+   Every send is a reply — always `reply_email`; there is NO `send_email`
+   fallback. The `Re:` subject and `in_reply_to=msg["message_id"]` are
+   loop-side one-liners. The reply is sent ONLY if the agent produced a
+   non-empty reply body; if the agent returns no content, the loop skips
+   the send (and the message-handling decision in that case is a loop
+   concern, not a seam concern).
+   **Clarification (P1-003 cross-domain review):** `reply_email` sets the
+   HTML content type when `html_body` is passed; the loop forwards the
+   agent's HTML as `html_body=` (not `body=`) and does NOT construct MIME
+   itself. The HTML content-type routing lives in `simple_email_gw`, not in
+   this package. The plain-text alternative (`text_body=`) is intentionally
+   empty in the first pass; accessibility polish is deferred.
 3. Mark the original message `\Seen`.
 4. Move the original to the archive folder.
 
@@ -500,6 +514,9 @@ learned-behaviours file in version control.
 - Idempotency relies on IMAP flags, exactly as `pa-email` did: `UNSEEN`
   search returns only unprocessed messages; mark-read + archive ensures a
   message never reappears. No deduplication state is needed.
+- **The ordering (send → mark read → archive) is owned by the loop module
+  (P2-005).** There is no `Mailbox` seam object that owns it; the loop
+  sequences the calls to `IMAPClient`/`SMTPClient` directly.
 - **Critical ordering:** send the reply **before** marking read/archiving. If
   the reply fails, do not mark read — the message stays `UNSEEN` and is
   retried next iteration. If the reply succeeds but mark/archive fails, the
