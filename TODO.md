@@ -291,28 +291,48 @@ new bounded tools remain Phase B and are deliberately absent.
     NO instructions block. Identity/instructions live in the agent definition
     (system prompt) and the one-time session-setup step, not in the per-email
     payload. Pure function, no I/O.
-  - `build_message` accepts the `EmailMessage` dataclass defined in P1-003
-    (not a raw dict); reference the P1-003 `EmailMessage` fields as the
-    shared contract.
+  - **Scope update (post-P1-003 functional-analyst review):** the slim P1-003
+    implementation dropped the `EmailMessage` dataclass — `Mailbox.fetch()`
+    returns the raw `simple_email_gw` message dict directly. `build_message`
+    therefore accepts the raw `simple_email_gw` message dict (not an
+    `EmailMessage` dataclass) and reads the fields it needs directly from
+    the dict (e.g. `msg["subject"]`, `msg["from"]`, `msg["date"]`,
+    `msg["body"]`). Reference the `simple_email_gw` `fetch_message` dict
+    shape as the shared contract.
   - The session-setup step (agent reads `PERSONAL.md` and initializes) is run
     once at startup in the loop (P2-005), not here.
-  - **Acceptance:** given a fetched `EmailMessage`, returns the exact payload
-    string (headers + body, no `Instructions:` block); unit-testable with a
-    fixture.
+  - **Acceptance:** given a fetched `simple_email_gw` message dict, returns
+    the exact payload string (headers + body, no `Instructions:` block);
+    unit-testable with a fixture dict matching the gateway's `fetch_message`
+    shape.
   - **Satisfies:** handoff contract
 
 - [ ] **P2-007: Wire reply sending with correct threading (HTML)**
-  - In the loop, send via `Mailbox.reply()` using `reply_email` with
-    `in_reply_to=<RFC Message-ID>` from the fetched message. Fallback to
-    `send_email` with `Re: <subject>` if Message-ID is unavailable.
+  - **Scope update (post-P1-003 api-architect review):** the slim P1-003
+    `Mailbox.reply()` method already folds both transport paths internally
+    (`in_reply_to` present → `reply_email`; `in_reply_to=None` →
+    `send_email`). P2-007 therefore does NOT add a new `Mailbox.send()`
+    method — the loop-side logic is the remaining job:
+    - When the fetched message has no RFC Message-ID (or it is absent),
+      construct the `Re: <original subject>` subject string in the loop and
+      pass `in_reply_to=None` so `Mailbox.reply()` routes to `send_email`.
+    - When the fetched message carries an RFC Message-ID, pass it through
+      as `in_reply_to` so `Mailbox.reply()` routes to `reply_email` and
+      threading is preserved.
+    - Send the agent's HTML output verbatim as `html_body=` (the slim
+      `Mailbox.reply()` already forwards `html_body=` to the gateway); do
+      not re-render or mutate the HTML.
   - The body is **HTML** — the agent's `md_to_html`-converted output
     (returned by `agent.process()`). Set the appropriate content type for
     HTML; send the HTML verbatim, do not re-render.
   - Recipient safety is a `simple-email-gw` config concern
-    (`EMAIL_RECIPIENT_ADDRESSES`), not package code. No package-level
-    allowlist is written; document the gateway config in the README.
+    (`EMAIL_RECIPIENT_WHITELIST_ADDRESSES`), not package code. No
+    package-level allowlist is written; document the gateway config in the
+    README.
   - **Acceptance:** replies thread correctly in a mail client and render as
-    HTML; the reply body is the agent's HTML output verbatim.
+    HTML; the reply body is the agent's HTML output verbatim; the loop
+    chooses `in_reply_to` vs `None` correctly per the fetched message's
+    Message-ID presence.
   - **Satisfies:** handoff contract
 
 ### P3 — Tests
@@ -339,11 +359,25 @@ new bounded tools remain Phase B and are deliberately absent.
     `simple_email_gw`'s public surface — assert the seam methods map to the
     expected client calls (use a stub/spool or a documented test account if
     `simple-email-gw` provides one). Keep it useful, not exhaustive.
-  - Stub clients injected via `Mailbox(..., imap_client=...,
-    smtp_client=...)`; assert each `Mailbox` method calls the expected stub
-    method with the expected arguments (DI approach, not monkeypatching).
+  - **Scope update (post-P1-003 testing-engineer review):** the slim P1-003
+    implementation dropped the `imap_client`/`smtp_client` DI kwargs from
+    `Mailbox.__init__` — the slim seam is constructed as `Mailbox(account)`
+    with no injection surface. P3-003 must therefore decide its approach:
+    either (a) reintroduce a minimal DI surface (e.g. optional
+    `imap_client=`/`smtp_client=` kwargs) to keep the original DI-style
+    acceptance, or (b) use monkeypatching against the constructed
+    `Mailbox`'s `self._imap`/`self._smtp` attributes. The choice is left to
+    P3-003; the slim P1-003 deliberately does NOT expose DI kwargs.
+  - **html_body= routing regression test (testing-engineer recommendation,
+    blocking P2-007 live replies):** P3-003 MUST include a regression test
+    asserting `Mailbox.reply(..., html_body=...)` forwards `html_body=` to
+    the underlying gateway call (both `reply_email` when `in_reply_to` is
+    set and `send_email` when it is `None`) — never `body=`. A small version
+    of this test is being added in P1-003 itself; P3-003 should expand it
+    (cover both routing branches and the `text_body=''` default).
   - **Acceptance:** `make test` passes; the seam is exercised, not just
-    imported.
+    imported; the `html_body=` routing regression test covers both
+    `in_reply_to` branches.
   - **Satisfies:** tests (mailbox seam)
 
 ### P3 — Security (defense in depth)
@@ -417,7 +451,7 @@ new bounded tools remain Phase B and are deliberately absent.
     the owner" moment — the agent learns a behaviour, writes `PERSONAL.md`,
     commits, and pushes via full `yoker:git` (bounded tools, not a shell).
   - **Recipient safety:** document that it is a `simple-email-gw` config
-    option (`EMAIL_RECIPIENT_ADDRESSES`), not package code.
+    option (`EMAIL_RECIPIENT_WHITELIST_ADDRESSES`), not package code.
   - **Security configuration subsection (security-engineer recommendation):**
     include a short "Security configuration" section covering: (a) the
     self-trust blast radius — marking `[plugins.trusted] yoker_assistant =
