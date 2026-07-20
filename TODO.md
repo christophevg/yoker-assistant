@@ -23,7 +23,7 @@ new bounded tools remain Phase B and are deliberately absent.
     without error (exits cleanly when no config).
   - **Satisfies:** bootstrap
 
-- [ ] **P1-002: Add runtime dependencies**
+- [x] **P1-002: Add runtime dependencies** ✅ (2026-07-20, PR #2)
   - Depend on `yoker` (local path or PyPI), `simple-email-gw`, and `pkgq`
     (plugin). Document local-path wiring for development
     (`../yoker`, `../simple-email-gw`).
