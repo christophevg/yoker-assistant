@@ -65,12 +65,61 @@ new bounded tools remain Phase B and are deliberately absent.
   - Create `yoker_assistant/mailbox.py` wrapping `simple_email_gw`'s async
     `IMAPClient`/`SMTPClient`. Expose a small, typed surface:
     `Mailbox(account)` with `connect()`, `unread_ids()`, `fetch(id)`,
-    `reply(to, subject, body, in_reply_to)`, `mark_read(id)`, `archive(id)`,
-    `close()`.
+    `reply(to, subject, html_body, in_reply_to, *, text_body='')`,
+    `mark_read(id)`, `archive(id)`, `close()`.
   - No business logic here — pure seam. Configuration via `EmailAccount` from
     env/`.env`.
-  - **Acceptance:** module imports; each method maps 1:1 to a
-    `simple_email_gw` call; no inline agent/reasoning logic.
+  - **Scope/contract (cross-domain review consensus):**
+    - Mailbox is a thin async seam, long-lived: construct once, `await
+      connect()` once, `await close()` on shutdown; implements
+      `__aenter__`/`__aexit__`. Holds one IMAPClient + one SMTPClient.
+      simple_email_gw 0.3.0 clients are NOT async context managers
+      themselves.
+    - `fetch()` returns a typed `EmailMessage` dataclass (frozen, slots) with
+      fields: `id`, `subject`, `from_`, `to`, `date`, `body` (plain text),
+      `message_id` (RFC Message-ID; `''` if absent), `references`
+      (tuple[str,...]), `read`. This is the shared contract for P2-006
+      (handoff builder) and P3-003 (tests).
+    - `reply(to, subject, html_body, in_reply_to, *, text_body='')` — the
+      HTML parameter is named `html_body` to make routing to
+      simple_email_gw's `html_body=` explicit. `text_body` is the optional
+      plain-text alternative (intentionally empty in the first pass;
+      accessibility polish deferred).
+    - Constructor: `Mailbox(account, *, inbox_folder='INBOX',
+      archive_folder='Archive', imap_client=None, smtp_client=None)`. The
+      `imap_client`/`smtp_client` kwargs are for P3-003 dependency-injected
+      stubs.
+    - The seam does NOT swallow or retry connection/send failures — it
+      propagates exceptions from simple_email_gw so the loop's §7
+      backoff/skip policy handles them.
+    - The seam constructs `EmailAccount` via simple_email_gw's
+      `ServerConfig`/`get_accounts()` (inherits TLS 1.2+ with cert
+      verification; refuse/loudly warn on plaintext-credential configs).
+    - The seam does NOT reinvent the recipient allowlist — reply sending
+      delegates to simple_email_gw which enforces
+      `EMAIL_RECIPIENT_WHITELIST_ADDRESSES`.
+    - The seam must NOT call `get_secret_value()` outside gateway calls;
+      `EmailAccount.password` is a pydantic `SecretStr`;
+      `Mailbox.__repr__` redacts credentials.
+    - Logging posture: INFO counts/events only (e.g. "fetched N unseen");
+      never message bodies, credentials, or full headers.
+  - **Acceptance:** module imports; each method delegates to exactly one
+    `simple_email_gw` call, except `reply()` which branches between
+    `reply_email` and `send_email` on `in_reply_to` presence (transport
+    routing, not business logic); no inline agent/reasoning logic.
+  - **Blocking acceptance checks (cross-domain review):**
+    - `reply()` routes the agent's HTML through simple_email_gw's
+      `html_body=` parameter (not `body=`), so the reply renders as HTML in
+      the recipient's client.
+    - At startup (seam or loop init), assert
+      `get_recipient_whitelist().enabled is True` and non-empty — fail
+      closed for unattended operation (no silent reply-to-arbitrary-senders).
+  - **P1-002 errata (lands alongside P1-003):** rename
+    `EMAIL_RECIPIENT_ADDRESSES` →
+    `EMAIL_RECIPIENT_WHITELIST_ADDRESSES` in `.env.example` and `README.md`
+    (the documented env var name was wrong; simple_email_gw binds
+    `EMAIL_RECIPIENT_WHITELIST_ADDRESSES`, and the wrong name silently
+    disables the whitelist).
   - **Satisfies:** simple-email-gw seam
 
 ### P1 — yoker SDK integration
@@ -242,9 +291,12 @@ new bounded tools remain Phase B and are deliberately absent.
     NO instructions block. Identity/instructions live in the agent definition
     (system prompt) and the one-time session-setup step, not in the per-email
     payload. Pure function, no I/O.
+  - `build_message` accepts the `EmailMessage` dataclass defined in P1-003
+    (not a raw dict); reference the P1-003 `EmailMessage` fields as the
+    shared contract.
   - The session-setup step (agent reads `PERSONAL.md` and initializes) is run
     once at startup in the loop (P2-005), not here.
-  - **Acceptance:** given a fetched message dict, returns the exact payload
+  - **Acceptance:** given a fetched `EmailMessage`, returns the exact payload
     string (headers + body, no `Instructions:` block); unit-testable with a
     fixture.
   - **Satisfies:** handoff contract
@@ -287,6 +339,9 @@ new bounded tools remain Phase B and are deliberately absent.
     `simple_email_gw`'s public surface — assert the seam methods map to the
     expected client calls (use a stub/spool or a documented test account if
     `simple-email-gw` provides one). Keep it useful, not exhaustive.
+  - Stub clients injected via `Mailbox(..., imap_client=...,
+    smtp_client=...)`; assert each `Mailbox` method calls the expected stub
+    method with the expected arguments (DI approach, not monkeypatching).
   - **Acceptance:** `make test` passes; the seam is exercised, not just
     imported.
   - **Satisfies:** tests (mailbox seam)
@@ -319,6 +374,17 @@ new bounded tools remain Phase B and are deliberately absent.
     in built metadata and passes when deps are PyPI names only; verified
     with a deliberate path-dep injection in a throwaway build.
   - **Satisfies:** security (publish guard)
+
+- [ ] **S-03: File upstream issue against simple-email-gw for wrong env var
+  names in its README**
+  - Its README documents the wrong env var names
+    (`EMAIL_RECIPIENT_ADDRESSES` vs the actual
+    `EMAIL_RECIPIENT_WHITELIST_ADDRESSES` binding). Same bug affects all
+    consumers.
+  - **Acceptance:** an upstream issue is filed (link recorded here once
+    available) describing the wrong-name docs and the silent-disable
+    consequence.
+  - **Satisfies:** security (upstream docs correction)
 
 ### P4 — Documentation (tutorial)
 
@@ -358,11 +424,14 @@ new bounded tools remain Phase B and are deliberately absent.
     true; pkgq = true` admits ALL tool code from those packages as trusted
     with no per-call gate, so users must pin the installed version
     (`uv pip install yoker-assistant==<version>`) and verify the source;
-    (b) `EMAIL_RECIPIENT_ADDRESSES` as the primary reply-safety boundary —
-    it must be set to the single owner address or the agent could reply to
-    arbitrary senders; (c) the rule that `~/.yoker.toml` and `.env` are
-    NEVER committed (`.env` is already gitignored; a user who snapshots
-    `~/.yoker.toml` into a repo must gitignore it too).
+    (b) the correct env var name
+    `EMAIL_RECIPIENT_WHITELIST_ADDRESSES` as the primary reply-safety
+    boundary — it must be set to the single owner address or the agent
+    could reply to arbitrary senders; the whitelist is silently disabled
+    if unset/wrong (reply-to-arbitrary-senders risk); (c) the rule that
+    `~/.yoker.toml` and `.env` are NEVER committed (`.env` is already
+    gitignored; a user who snapshots `~/.yoker.toml` into a repo must
+    gitignore it too).
   - Use `c3:readme` for structure and badges.
   - **Acceptance:** README tells the build story end-to-end; a new reader can
     set it up and run `python -m yoker_assistant --once`; the porting map is
