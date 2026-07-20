@@ -24,9 +24,17 @@ classifiers = [
 ]
 keywords = ["yoker", "agent", "email", "assistant"]
 dependencies = [
-  "yoker",
-  "simple-email-gw",
-  "pkgq",
+  # yoker-as-SDK: the Agent + agent_path + process seam lands in 0.8.0
+  # (functional.md §2.3). Pin the lower bound so the published wheel
+  # pulls a version with the SDK surface this package depends on.
+  "yoker>=0.8.0",
+  # Email gateway — async IMAPClient/SMTPClient + EmailAccount env contract
+  # (functional.md §2.4). 0.3.0 is the current published line.
+  "simple-email-gw>=0.3.0",
+  # Loaded as a yoker plugin (yoker.toml [plugins] / [plugins.trusted]),
+  # not imported directly. Pin the published version so plugin loading
+  # resolves a known-compatible release.
+  "pkgq>=0.3.2",
 ]
 
 [project.optional-dependencies]

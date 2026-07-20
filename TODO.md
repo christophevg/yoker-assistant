@@ -107,16 +107,27 @@ new bounded tools remain Phase B and are deliberately absent.
       `color` frontmatter field.
     - **Rework** the `tools:` frontmatter to the bounded yoker set: `read`,
       `list`, `search`, `write`, `update`, `websearch`, `webfetch`, `skill`,
-      `agent`, `git` (**full git**: read + commit + push), `pkgq:find_package`,
+      `agent`, `git` (**full git**: read + commit + push), `pkgq:find`,
       and `yoker_assistant:md_to_html` (the custom local tool from P2-008).
+    - **ERRATA (pkgq tool name — api-architect review of P1-002):** the
+      published `pkgq` yoker plugin exposes its package-finder tool as
+      **`pkgq:find`**, NOT `pkgq:find_package`. The `find_package` name is
+      the MCP-server tool surface (a different integration), not the yoker
+      plugin tool. Use `pkgq:find` in the `agents/assistant.md` `tools:`
+      frontmatter. `functional.md` §3.2 and §3.3 currently say
+      `pkgq:find_package` — this is an errata in the analysis document and
+      will be corrected when P2-001 is implemented (the same edit that ports
+      the agent definition updates §3.2/§3.3 to `pkgq:find`).
     - Rewrite the "Process" and "Reply" phases to fit the persistent-session
       email handoff: each email is the next user message in an ongoing
       session; the reply is composed in markdown then converted to HTML via
       the `md_to_html` tool; no outbox files.
   - **Acceptance:** `Agent(agent_path="agents/assistant.md")` loads; declared
-    tools all resolve (yoker logs no missing-tool warnings); the definition
-    contains no `mcp__` references and no `Bash`; the definition instructs
-    reading `PERSONAL.md` at session start and permits writing to it.
+    tools all resolve (yoker logs no missing-tool warnings — in particular
+    `pkgq:find` resolves; `pkgq:find_package` would NOT resolve and must
+    not appear); the definition contains no `mcp__` references and no
+    `Bash`; the definition instructs reading `PERSONAL.md` at session start
+    and permits writing to it.
   - **Satisfies:** port agent
 
 ### P2 — Port the skills
