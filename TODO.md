@@ -27,6 +27,19 @@ new bounded tools remain Phase B and are deliberately absent.
   - Depend on `yoker` (local path or PyPI), `simple-email-gw`, and `pkgq`
     (plugin). Document local-path wiring for development
     (`../yoker`, `../simple-email-gw`).
+  - **Local-path dev-wiring mechanism (security-engineer recommendation,
+    blocking):** keep `[project.dependencies]` as PyPI names only — NEVER
+    add `file://`/`path =` entries to `[project.dependencies]` (they would
+    leak into published sdist/wheel metadata and corrupt installability).
+    Express local-path dev wiring via `[tool.uv.sources]` (uv-native,
+    dev-only, structurally excluded from wheel/sdist metadata):
+    ```
+    [tool.uv.sources]
+    yoker = { path = "../yoker", editable = true }
+    simple-email-gw = { path = "../simple-email-gw", editable = true }
+    ```
+    This is the intended mechanism — the structural exclusion from PyPI
+    metadata is the safety property, not contributor discipline.
   - Document the required user config in `~/.yoker.toml`: `[plugins] enabled
     = true; packages = ["yoker_assistant", "pkgq"]` and `[plugins.trusted]
     yoker_assistant = true; pkgq = true` (self-trust is REQUIRED for
@@ -41,7 +54,9 @@ new bounded tools remain Phase B and are deliberately absent.
   - Add `.env.example` for email account config.
   - **Acceptance:** `make env-dev` resolves all deps; the README documents
     the required `~/.yoker.toml` lines; a `yoker.toml.example` is provided
-    as reference.
+    as reference with a REFERENCE ONLY header and no real `api_key`;
+    `make pre-publish` (or equivalent) confirms no `file://`/path deps
+    leak into the built sdist/wheel metadata.
   - **Satisfies:** bootstrap
 
 ### P1 — simple-email-gw integration
@@ -265,6 +280,35 @@ new bounded tools remain Phase B and are deliberately absent.
     imported.
   - **Satisfies:** tests (mailbox seam)
 
+### P3 — Security (defense in depth)
+
+- [ ] **S-01: Add `SECURITY.md` describing the `__YOKER_MANIFEST__` review
+  process**
+  - Every addition to `__YOKER_MANIFEST__` auto-trusts on user install via
+    `[plugins.trusted] yoker_assistant = true` — there is no secondary
+    review gate inside the package. `SECURITY.md` documents the review
+    process contributors must follow before adding a tool to the manifest
+    (blast-radius assessment, capability review, version pinning).
+  - **Priority rationale:** land before Phase B so the review process exists
+    before any second tool is added to the manifest.
+  - **Acceptance:** `SECURITY.md` exists at repo root and documents the
+    manifest-addition review process; the README links to it from the
+    Security configuration subsection.
+  - **Satisfies:** security (manifest review process)
+
+- [ ] **S-02: `make pre-publish` guard rejecting non-registry source URLs in
+  built metadata**
+  - Defense in depth: a publish-time guard that fails `make pre-publish` if
+    the built sdist/wheel METADATA contains `file://`, `path =`, or any
+    non-registry source URL. Prevents the P1-002 path-dep leakage class from
+    ever reaching PyPI even if `[tool.uv.sources]` discipline slips.
+  - Implement as a check over `make build` output: `twine check dist/*` plus
+    a grep of the built `METADATA` file for `file:` / `@ file://`.
+  - **Acceptance:** `make pre-publish` fails when a path/file URL is present
+    in built metadata and passes when deps are PyPI names only; verified
+    with a deliberate path-dep injection in a throwaway build.
+  - **Satisfies:** security (publish guard)
+
 ### P4 — Documentation (tutorial)
 
 - [ ] **P4-001: Write the "how was this built?" tutorial README**
@@ -297,6 +341,17 @@ new bounded tools remain Phase B and are deliberately absent.
     commits, and pushes via full `yoker:git` (bounded tools, not a shell).
   - **Recipient safety:** document that it is a `simple-email-gw` config
     option (`EMAIL_RECIPIENT_ADDRESSES`), not package code.
+  - **Security configuration subsection (security-engineer recommendation):**
+    include a short "Security configuration" section covering: (a) the
+    self-trust blast radius — marking `[plugins.trusted] yoker_assistant =
+    true; pkgq = true` admits ALL tool code from those packages as trusted
+    with no per-call gate, so users must pin the installed version
+    (`uv pip install yoker-assistant==<version>`) and verify the source;
+    (b) `EMAIL_RECIPIENT_ADDRESSES` as the primary reply-safety boundary —
+    it must be set to the single owner address or the agent could reply to
+    arbitrary senders; (c) the rule that `~/.yoker.toml` and `.env` are
+    NEVER committed (`.env` is already gitignored; a user who snapshots
+    `~/.yoker.toml` into a repo must gitignore it too).
   - Use `c3:readme` for structure and badges.
   - **Acceptance:** README tells the build story end-to-end; a new reader can
     set it up and run `python -m yoker_assistant --once`; the porting map is
