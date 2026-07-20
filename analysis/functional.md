@@ -194,17 +194,38 @@ from simple_email_gw import EmailAccount, IMAPClient, SMTPClient
 account = EmailAccount(name="default", imap_host=..., smtp_host=...,
                         username=..., password=...)
 
-async with IMAPClient(account) as imap:
+# simple_email_gw 0.3.0 IMAPClient/SMTPClient do NOT implement
+# __aenter__/__aexit__; they expose explicit connect()/disconnect() methods.
+# The Mailbox seam (P1-003) wraps them as a long-lived async context manager
+# (Mailbox implements __aenter__/__aexit__ itself; construct once, await
+# connect() once, await close() on shutdown).
+imap = IMAPClient(account)
+await imap.connect()
+try:
     ids = await imap.search(folder="INBOX", criteria="UNSEEN")
     msg = await imap.fetch_message(message_id=ids[0], folder="INBOX")
     # msg -> dict with id, folder, subject, from, to, body, attachments
     await imap.mark_message(message_id, "INBOX", "\\Seen", "add")
     await imap.move_message(message_id, "INBOX", "Archive")
+finally:
+    await imap.disconnect()
 
 smtp = SMTPClient(account)
-await smtp.send_email(to=[sender], subject=f"Re: {subject}", body=reply)
-# or smtp.reply_email(to=sender, subject=..., body=..., in_reply_to=msg_id)
+await smtp.connect()
+try:
+    await smtp.send_email(to=[sender], subject=f"Re: {subject}", body=reply)
+    # or smtp.reply_email(to=sender, subject=..., html_body=..., in_reply_to=msg_id)
+finally:
+    await smtp.disconnect()
 ```
+
+**Errata (P1-003 cross-domain review):** an earlier version of this section
+showed `async with IMAPClient(account) as imap:`. That is inaccurate —
+simple_email_gw 0.3.0 `IMAPClient`/`SMTPClient` are NOT async context
+managers. The `Mailbox` seam provides its own `__aenter__`/`__aexit__`
+wrapping the long-lived clients (construct once, `await connect()` once,
+`await close()` on shutdown). The method signatures and behaviour described
+below remain correct.
 
 `EmailAccount` fields: `name`, `imap_host`, `smtp_host`, `username`,
 `password`. Configuration can come from env vars
@@ -449,10 +470,15 @@ render well together, so the reply is HTML end-to-end.
 1. Capture `reply_html = await agent.process(message)` (the agent has
    already converted markdown → HTML via its tool).
 2. Send via `SMTPClient.reply_email(to=sender, subject=f"Re: {subject}",
-   body=reply_html, in_reply_to=message_id)` (threading preserved) — or
+   html_body=reply_html, in_reply_to=message_id)` (threading preserved) — or
    `send_email` if only the MCP-style id is available (the async client's
    `fetch_message` returns the RFC Message-ID header, so `reply_email` is
    usable). The body is HTML; set the appropriate content type for HTML.
+   **Clarification (P1-003 cross-domain review):** `reply_email`/`send_email`
+   set the HTML content type when `html_body` is passed; the Mailbox seam
+   forwards the agent's HTML as `html_body=` (not `body=`) and does NOT
+   construct MIME itself. The plain-text alternative (`text_body=`) is
+   intentionally empty in the first pass; accessibility polish is deferred.
 3. Mark the original message `\Seen`.
 4. Move the original to the archive folder.
 

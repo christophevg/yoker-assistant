@@ -69,10 +69,10 @@ EMAIL_IMAP_HOST=imap.example.com
 EMAIL_SMTP_HOST=smtp.example.com
 EMAIL_USERNAME=assistant@example.com
 EMAIL_PASSWORD=your-app-password-here
-EMAIL_RECIPIENT_ADDRESSES=owner@example.com
+EMAIL_RECIPIENT_WHITELIST_ADDRESSES=owner@example.com
 ```
 
-`EMAIL_RECIPIENT_ADDRESSES` is the **primary reply-safety boundary**: the
+`EMAIL_RECIPIENT_WHITELIST_ADDRESSES` is the **primary reply-safety boundary**: the
 assistant may only reply to addresses in this whitelist. Set it to the
 single owner address; leaving it broad allows the agent to reply to
 arbitrary senders. This is a `simple-email-gw` config concern, not package
