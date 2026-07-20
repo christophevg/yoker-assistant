@@ -61,7 +61,7 @@ new bounded tools remain Phase B and are deliberately absent.
 
 ### P1 — simple-email-gw integration
 
-- [ ] **P1-003: P1-002 errata + functional.md corrections**
+- [x] **P1-003: P1-002 errata + functional.md corrections** ✅ (2026-07-20, PR #3)
   - **DESCOPED.** The original P1-003 scope (a `Mailbox` wrapper class over
     `simple_email_gw`'s async `IMAPClient`/`SMTPClient`) was descoped per
     owner feedback — wrapping two existing classes in a thin indirection
