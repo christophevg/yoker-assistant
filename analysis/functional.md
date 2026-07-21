@@ -127,7 +127,7 @@ Key facts of the seam:
 - Agent definitions are markdown files with YAML frontmatter (`name`,
   `description`, `tools`, optional `model`). Built-in tools may be referenced
   with or without the `yoker:` prefix and are matched case-insensitively;
-  plugin tools must use their full namespace (e.g. `pkgq:find_package`).
+  plugin tools must use their full namespace (e.g. `pkgq:find`).
 - Tools are plain Python functions/callables annotated with guardrail markers
   (`Path`, `Url`, `Query`, `Text`). Plugins expose tools, skills, and agents
   via a top-level `__YOKER_MANIFEST__`.
@@ -305,7 +305,7 @@ case-insensitively to bare names):
 | `ListMcpResourcesTool` | — | **REMOVED** | MCP-specific; not part of yoker's tool model for this showcase. |
 | `ReadMcpResourceTool` | — | **REMOVED** | MCP-specific. |
 | `mcp__plugin_c3_email__*` (all 10) | — | **REMOVED** | The email loop moves to Python. This is the central reason the project exists. |
-| `mcp__plugin_c3_pkgq__find_package` | `pkgq:find_package` | **REWORKED** | Loaded as a yoker **plugin** (via `yoker.toml [plugins]` / `--with pkgq`) instead of an MCP server. Same capability, yoker-native mechanics. |
+| `mcp__plugin_c3_pkgq__find_package` | `pkgq:find` | **REWORKED** | Loaded as a yoker **plugin** (via `yoker.toml [plugins]` / `--with pkgq`) instead of an MCP server. Same capability, yoker-native mechanics. |
 | `Agent` | `yoker:agent` | **KEPT** | yoker spawns isolated subagents with recursion limits; matches c3's "1 level of sub-agents" intent. |
 
 ### 3.3 The bounded tool set for this first pass
@@ -321,7 +321,7 @@ After the port, the assistant's curated tool set is:
   showcase: the agent autonomously maintains its own `PERSONAL.md`
   learned-behaviours file in version control via bounded git tools, not a
   shell. See the demo beat in §4.3.
-- `pkgq:find_package` — via the pkgq plugin (demonstrates yoker plugin
+- `pkgq:find` — via the pkgq plugin (demonstrates yoker plugin
   loading)
 - `yoker_assistant:md_to_html` — a **custom local tool** defined in THIS
   package as a yoker plugin (see §2.3.1). Defined in
