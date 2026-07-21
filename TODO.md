@@ -238,6 +238,12 @@ new bounded tools remain Phase B and are deliberately absent.
     `src/yoker_assistant/__init__.py`. Register it via the package's own
     `yoker.toml [plugins]` (NOT programmatic — no `plugins=()` arg to
     `Agent`).
+  - **Owner instruction (PR #5 review):** the `md_to_html` tool already
+    exists as `c3/bin/md-to-html.py` (used by the current c3 assistant via
+    the `pa-email` skill). Don't reinvent the wheel — reuse the existing
+    conversion logic. P2-008's implementation should reuse/import/vendor
+    the core conversion from `c3/bin/md-to-html.py`, not write a new
+    converter from scratch.
   - **`__init__.py` discipline:** `__init__.py` must ONLY define the
     manifest and import tool functions — NO `Agent` construction or loop
     logic there (that lives in `__main__`/`loop`/`agent` modules). This
