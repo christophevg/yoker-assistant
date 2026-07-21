@@ -106,7 +106,7 @@ new bounded tools remain Phase B and are deliberately absent.
 
 ### P1 — yoker SDK integration
 
-- [ ] **P1-004: Agent construction + one-time session setup**
+- [x] **P1-004: Agent construction + one-time session setup** ✅ (2026-07-21, PR #4)
   - **No `Assistant` wrapper class.** The loop (P2-005) constructs yoker's
     `Agent` directly. There is no `agent.py` module that wraps `Agent` in
     another class — such a wrapper would add no behavior beyond
