@@ -1,5 +1,44 @@
 # P1-004 Cross-Domain Design Review — Consensus
 
+## DESCOPE UPDATE
+
+The owner challenged the `Assistant` wrapper class design during the
+PR #4 plan review — the same over-engineering pattern as P1-003's
+`Mailbox` wrapper. The descope drops the wrapper class entirely.
+
+**The Wrapper Check.** The `Assistant` class adds no behavior beyond
+`Persisted(...)` config in `__init__` and forwarding `process()` /
+`setup()` unchanged to `Agent.process()`. It fails the check: the
+class is pure pass-through with no added logic, no branching, no
+state of its own.
+
+**The descope.**
+
+- No `Assistant` class.
+- The loop (P2-005) constructs `Agent` directly with
+  `Persisted(SimpleContextManager(), session_id="yoker-assistant")`.
+- The one-time setup turn is
+  `await agent.process(_INITIALIZE_PROMPT)` inlined in the loop.
+- `agent.py` either disappears or shrinks to module-level constants
+  (`_SESSION_ID`, `_INITIALIZE_PROMPT`) plus optionally a factory
+  function `make_agent(agent_path) -> Agent` — no class, no
+  forwarding methods.
+
+**What still applies.** The security findings below — no guard
+beyond owner's spec; two Medium architectural risks accepted by
+design (F1 prompt-injection persistence, F2 on-disk session
+persistence) — still apply to the descoped design. The
+persistent-session architecture is unchanged (same `Agent` +
+`Persisted` + fixed session id); only the wrapper class is gone.
+
+**TODO.md state.** P1-004, P2-005, and P3-002 have been updated to
+reflect the descope.
+
+The analysis below is retained as the historical record of the
+original cross-domain review of the `Assistant` wrapper design.
+
+---
+
 ## Task
 
 **P1-004 — Implement the agent seam module.** Create

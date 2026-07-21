@@ -1,3 +1,5 @@
+> **DESCOPE NOTE (per owner feedback during PR #4 plan review):** The `Assistant` wrapper class design reviewed below was dropped — it fails the Wrapper Check (adds no behavior beyond `Persisted(...)` config and forwarding `process()`/`setup()` unchanged to `Agent`). The security findings below still apply to the descoped design: the persistent-session architecture is unchanged (same `Agent` + `Persisted` + fixed session id), only the wrapper class is gone. The "no guard beyond owner's spec" verdict and the two Medium architectural risks (prompt-injection persistence, on-disk session persistence) carry over unchanged. See `reporting/p1-004/consensus.md` for the descope update.
+
 # Security Engineer Review — P1-004: Implement the agent seam module
 
 Scope: the `yoker_assistant/agent.py` seam — the `Assistant` class that

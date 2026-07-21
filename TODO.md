@@ -106,21 +106,50 @@ new bounded tools remain Phase B and are deliberately absent.
 
 ### P1 — yoker SDK integration
 
-- [ ] **P1-004: Implement the agent seam module**
-  - Create `yoker_assistant/agent.py` wrapping yoker's `Agent`. Expose
-    `Assistant(agent_path)` with `async def process(email_message) -> str`.
+- [ ] **P1-004: Agent construction + one-time session setup**
+  - **No `Assistant` wrapper class.** The loop (P2-005) constructs yoker's
+    `Agent` directly. There is no `agent.py` module that wraps `Agent` in
+    another class — such a wrapper would add no behavior beyond
+    configuration in `__init__` and forwarding `process()` unchanged, and
+    fails the Wrapper Check.
   - The `Agent` is constructed **ONCE** at startup with a **persistent
-    context manager** (yoker's `PersistenceContextManager` or equivalent).
-    The same session lives for the whole package run; each `process()` call
-    is the next user message in that session. Do NOT construct a fresh
-    `Agent`/context per email.
-  - Expose a `setup()` step run once at startup: the agent reads
-    `PERSONAL.md` (via `yoker:read`) and initializes identity for the
-    ongoing session.
-  - **Acceptance:** `Assistant.process("test")` returns a string using a real
-    backend (or is mockable for tests); a second `process()` call sees the
-    first call's context (persistent session); no email/IMAP references in
-    this module.
+    context manager**: `Agent(agent_path="agents/assistant.md",
+    context_manager=Persisted(SimpleContextManager(),
+    session_id="yoker-assistant"))`. The same session lives for the whole
+    package run; each `process()` call is the next user message in that
+    session. Do NOT construct a fresh `Agent`/context per email.
+  - The one-time session-setup turn is **inlined in the loop** as
+    `await agent.process(_INITIALIZE_PROMPT)` (a module-level constant for
+    the initialize prompt) before the poll loop begins. The agent reads
+    `PERSONAL.md` (via `yoker:read`) on that first turn and initializes
+    identity for the ongoing session. No `setup()` method on a wrapper.
+  - `agent.py` either disappears entirely (the two lines above live
+    directly in `__main__.py`/`loop.py`) or shrinks to **module-level
+    constants** (`_INITIALIZE_PROMPT`) plus optionally a factory function
+    `make_agent(agent_path) -> Agent` that returns the configured `Agent`
+    instance — no class, no forwarding methods. The factory is only
+    warranted if the wiring (context manager + agent_path + any future
+    config) grows past a one-liner; otherwise inline it.
+  - **Note (original scope, retained for the historical record):** the
+    original P1-004 design proposed an `Assistant(agent_path)` class in
+    `yoker_assistant/agent.py` with `async def process(email_message) ->
+    str` forwarding to `Agent.process()` and a `setup()` step forwarding
+    to `Agent.process(_INITIALIZE_PROMPT)`. The owner challenged this as
+    the same useless-wrapper pattern caught earlier on P1-003's `Mailbox`
+    ("what behavior does this class add beyond configuration and
+    forwarding?"). The answer was nothing — the wrapper earned no
+    behavior — so it was descoped. The loop now constructs `Agent`
+    directly; the one-time setup is an inlined `await
+    agent.process(_INITIALIZE_PROMPT)`. See P1-003's descope note for the
+    antecedent pattern.
+  - **Acceptance:** the loop constructs `Agent` directly (no `Assistant`
+    class exists in the package); `await agent.process("test")` returns a
+    string using a real backend (or is mockable for tests via an `Agent`
+    stub); a second `process()` call sees the first call's context
+    (persistent session via `Persisted(SimpleContextManager(),
+    session_id="yoker-assistant")`); the one-time setup turn is `await
+    agent.process(_INITIALIZE_PROMPT)` inlined in the loop, not a method
+    on a wrapper object; no email/IMAP references in this module/section.
   - **Satisfies:** yoker SDK seam
 
 ### P2 — Port the agent definition
@@ -243,14 +272,16 @@ new bounded tools remain Phase B and are deliberately absent.
 
 - [ ] **P2-005: Implement the main loop**
   - Create `yoker_assistant/__main__.py` (and `loop.py` if separated):
-    - `async def run()`: build `EmailAccount`, the `Assistant` (constructed
-      ONCE with a persistent context manager), and the `simple_email_gw`
-      clients directly — `imap = IMAPClient(account)`,
-      `smtp = SMTPClient(account)`. Run the one-time session-setup step
-      (`Assistant.setup()` — send an initialize message to the session so
-      the agent reads `PERSONAL.md` via `yoker:read` and initializes
-      identity on the first turn); then `await imap.connect()` once and
-      enter the loop.
+    - `async def run()`: build `EmailAccount`, construct the `Agent`
+      **ONCE** directly (per P1-004 — no `Assistant` wrapper):
+      `agent = Agent(agent_path="agents/assistant.md",
+      context_manager=Persisted(SimpleContextManager(),
+      session_id="yoker-assistant"))`, and the `simple_email_gw` clients
+      directly — `imap = IMAPClient(account)`,
+      `smtp = SMTPClient(account)`. Run the one-time session-setup turn
+      inlined: `await agent.process(_INITIALIZE_PROMPT)` (the agent reads
+      `PERSONAL.md` via `yoker:read` and initializes identity on the first
+      turn); then `await imap.connect()` once and enter the loop.
     - Per iteration: `await imap.search(folder="INBOX", criteria="UNSEEN")`
       → for each id: `await imap.fetch_message(...)` → build the handoff
       payload (P2-006) → `reply_html = await agent.process(message)` (next
@@ -284,6 +315,11 @@ new bounded tools remain Phase B and are deliberately absent.
     - Error handling per §7 of the analysis: connection failure backs off;
       agent/send failure does not mark read; per-message exceptions skip and
       continue.
+  - **Note (Wrapper Check):** the loop itself is multi-step orchestration
+    (poll → fetch → process → reply → mark → archive) — that IS earned
+    behavior, not a wrapper. No sub-wrappers are introduced inside it:
+    `Agent`, `IMAPClient`, `SMTPClient`, and `build_message` are all
+    called directly.
   - **Acceptance:** `python -m yoker_assistant --once` runs one poll and exits
     cleanly on an empty inbox; a seeded unread email produces a reply (with a
     live backend) and is marked read + archived; the reply is sent via
@@ -348,7 +384,8 @@ new bounded tools remain Phase B and are deliberately absent.
 
 - [ ] **P3-002: Tests for the polling logic**
   - `tests/test_loop.py`: with fake `IMAPClient`/`SMTPClient` stubs (no
-    network) and a fake `Assistant` (no backend), assert the loop:
+    network) and a fake `Agent` (no backend — a stub that returns a canned
+    reply string from `process()`), assert the loop:
     fetches unseen, calls `process`, sends the reply via
     `smtp.reply_email(..., html_body=<agent output>, in_reply_to=msg["message_id"])`
     (NOT `body=`, NOT `send_email`), marks read, archives, in order;
@@ -397,8 +434,13 @@ new bounded tools remain Phase B and are deliberately absent.
     the built sdist/wheel METADATA contains `file://`, `path =`, or any
     non-registry source URL. Prevents the P1-002 path-dep leakage class from
     ever reaching PyPI even if `[tool.uv.sources]` discipline slips.
-  - Implement as a check over `make build` output: `twine check dist/*` plus
-    a grep of the built `METADATA` file for `file:` / `@ file://`.
+  - **Implement as a Makefile target, not a Python wrapper module.** The
+    guard is two shell steps over `make build` output: `twine check dist/*`
+    plus a grep of the built `METADATA` file for `file:` / `@ file://`.
+    No Python class, no adapter, no façade — a Makefile recipe is the
+    right-sized home for "run two commands and fail on grep hit." A
+    Python wrapper around `twine check` + `grep` would add no behavior
+    beyond forwarding and fails the Wrapper Check.
   - **Acceptance:** `make pre-publish` fails when a path/file URL is present
     in built metadata and passes when deps are PyPI names only; verified
     with a deliberate path-dep injection in a throwaway build.

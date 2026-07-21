@@ -1,3 +1,5 @@
+> **DESCOPE NOTE (per owner feedback during PR #4 plan review):** The `Assistant` wrapper class design reviewed below was dropped — it fails the Wrapper Check (adds no behavior beyond `Persisted(...)` config and forwarding `process()`/`setup()` unchanged to `Agent`). The loop (P2-005) now constructs `Agent` directly. The content below is the historical review of the original design. The verified yoker 0.8.0 API surface (`Agent` constructor, `Persisted` rename, `async process()`) and the §2.3 erratum still apply. See `reporting/p1-004/consensus.md` for the descope update.
+
 # API Architect Review — P1-004: Implement the agent seam module
 
 Scope: the `yoker_assistant/agent.py` seam that wraps yoker's `Agent` and
