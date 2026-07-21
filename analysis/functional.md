@@ -107,7 +107,8 @@ from yoker import Agent
 
 # Constructed ONCE at startup with a persistent context manager.
 agent = Agent(agent_path="agents/assistant.md",
-              context_manager=PersistenceContextManager(...))
+              context_manager=Persisted(SimpleContextManager(),
+                                         session_id="yoker-assistant"))
 # Each email is the next user message in the SAME session.
 response = await agent.process(message)         # returns the agent's text
 ```
