@@ -10,4 +10,8 @@ def test_package_imports() -> None:
   import yoker_assistant
 
   assert hasattr(yoker_assistant, "__YOKER_MANIFEST__")
-  assert yoker_assistant.__YOKER_MANIFEST__.tools == []
+  # P2-008: the md_to_html tool is registered in the manifest.
+  tool_names = [
+    getattr(t, "__name__", t.__class__.__name__) for t in yoker_assistant.__YOKER_MANIFEST__.tools
+  ]
+  assert "md_to_html" in tool_names
