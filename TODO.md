@@ -242,7 +242,7 @@ new bounded tools remain Phase B and are deliberately absent.
 
 ### P2 — Custom tool
 
-- [ ] **P2-008: Implement the markdown→HTML converter as a yoker tool**
+- [x] **P2-008: Implement the markdown→HTML converter as a yoker tool** ✅ (2026-07-22, PR #6)
   - Create a custom local tool `md_to_html` exposed as a yoker plugin/tool
     defined in THIS package (not a yoker built-in). Define it in
     `src/yoker_assistant/tools.py` as a plain Python function annotated with
