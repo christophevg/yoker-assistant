@@ -13,9 +13,10 @@ functions — no side effects at import time.
 
 from yoker.plugins import PluginManifest
 
+from yoker_assistant.tools import md_to_html
+
 __version__ = "0.1.0"
 
-# P1-001: empty tools list. The md_to_html tool is added in P2-008.
-__YOKER_MANIFEST__ = PluginManifest(tools=[])
+__YOKER_MANIFEST__ = PluginManifest(tools=[md_to_html])
 
 __all__ = ["__YOKER_MANIFEST__", "__version__"]
