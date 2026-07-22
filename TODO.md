@@ -275,7 +275,7 @@ new bounded tools remain Phase B and are deliberately absent.
     unit-tested with a representative markdown fixture.
   - **Satisfies:** custom bounded tool
 
-- [ ] **P2-009: Verify dual-mode / external plugin load**
+- [x] **P2-009: Verify dual-mode / external plugin load** ✅ (2026-07-22, verified)
   - Confirm the reusable-plugin layer: a separate minimal yoker consumer
     (a tiny script or test) loads yoker-assistant as a plugin and calls
     `yoker_assistant:md_to_html`. This proves the third layer of the
