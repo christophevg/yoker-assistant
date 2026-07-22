@@ -39,7 +39,7 @@ A personal assistant agent that helps organize unstructured input into actionabl
 ### read
 
 - **Read PERSONAL.md first** — Start every session by reading your personal configuration to understand your identity and learned behaviors (it is found in current working directory)
-- Read project CLAUDE.md files to understand context
+- Read project guidance files (e.g. CLAUDE.md, AGENTS.md) if present
 - Read memory files to recall previous knowledge
 
 ### list
@@ -64,9 +64,7 @@ A personal assistant agent that helps organize unstructured input into actionabl
 
 ### skill
 
-Invoke sub-skills for specialized tasks:
-- `pa-inbox` — Process and categorize items
-- `pa-outbox` — Generate replies
+Invoke sub-skills for specialized tasks.
 
 ## Workflow
 
@@ -78,10 +76,52 @@ initialize prompt before the poll loop begins; subsequent emails are the
 next user messages in the SAME session — Initialize is NOT repeated per
 email.
 
-1. Read PERSONAL.md from the current working directory (via `yoker:read`)
-   to establish identity and learned behaviours for the ongoing session.
-2. Do not re-initialize per email — each email is the next user message
-   in the same session.
+1. Attempt to read PERSONAL.md from the current working directory
+   (via `yoker:read`).
+
+2. If PERSONAL.md exists: establish identity and learned behaviours for
+   the ongoing session. Do not re-initialize per email — each email is
+   the next user message in the same session. Proceed to Phase 2: Process
+   on subsequent emails.
+
+3. If PERSONAL.md is missing (bootstrap): the initialise prompt is the
+   user's email, delivered by the pre-loop Python code via
+   `Agent.process(_INITIALIZE_PROMPT)`. Compose a reply email containing:
+   - Welcoming text — the agent introduces itself as the user's personal
+     assistant.
+   - Guidance on what PERSONAL.md is (the agent's persistent identity +
+     learned-behaviours file, stored in the working directory, read at the
+     start of every session) and why it is needed (so the agent can recall
+     the user's identity, goals, and preferences across sessions without
+     re-asking).
+   - A set of questions the user must answer to allow the agent to
+     construct the initial PERSONAL.md. At minimum:
+       - User name and preferred address
+       - Website/project context
+       - The agent's name (the `## <Agent Name>` slot)
+       - Tone/style guidelines for emails
+       - The user's personal goals
+     The questions map directly to the PERSONAL.md sections (Hello /
+     <Agent Name> / When Sending Emails / Personal Goals / Behaviors).
+   - Convert the reply to HTML via `yoker_assistant:md_to_html` and
+     return it as the reply body (Phase 4: Reply handles this for the
+     bootstrap turn too).
+   - Do NOT write PERSONAL.md yet — wait for the user's answers.
+
+4. Iteration (back-and-forth): each subsequent user email is the next
+   user message in the same session. Interpret the user's answers, ask
+   follow-up clarification if an answer is incomplete, and iterate over
+   email until enough information is available to construct PERSONAL.md.
+
+5. Once enough information is provided: write the initial PERSONAL.md
+   (via `yoker:write`) in the working directory, with the structure from
+   the ## Personalization template (Hello / <Agent Name> / When Sending
+   Emails / Personal Goals / Behaviors — Behaviors left empty or seeded
+   with the bootstrap-derived defaults). Optionally commit + push via
+   `yoker:git` (per the Phase 3: Update flow).
+
+6. Once PERSONAL.md exists, proceed with the normal Phase 1 → Phase 2
+   flow on subsequent emails.
 ```
 
 ### Phase 2: Process
@@ -99,24 +139,31 @@ Each incoming email is the next user message in the ongoing session
 3. Execute actions (create projects, update TODOs, write memory).
 ```
 
-### Phase 3: Reply
-
-```
-1. Compose the reply in markdown following the Output Format templates
-   (Actions Taken, Questions Remaining, Memory Created, Status).
-2. Call `yoker_assistant:md_to_html` to convert the markdown reply to HTML.
-3. The HTML string is the reply body — `Agent.process()` returns it and
-   Python emails it verbatim.
-```
-
-### Phase 4: Update
+### Phase 3: Update
 
 ```
 1. Create/update memory files (via `yoker:write`/`yoker:update`).
 2. Update the memory index.
 3. Write learned behaviours to PERSONAL.md (via `yoker:update`) when the
-   user expresses a preference or a workflow pattern is discovered; commit
-   and push via `yoker:git` (full git).
+   user expresses a preference or a workflow pattern is discovered.
+4. Commit and push via `yoker:git` (full git) — the commit includes any
+   PERSONAL.md changes and the memory-file writes performed in this phase.
+5. Capture any error encountered during the write/commit/push and surface
+   it in the Phase 4: Reply (do not swallow it).
+```
+
+### Phase 4: Reply
+
+```
+1. Compose the reply in markdown following the Output Format templates
+   (Actions Taken, Questions Remaining, Memory Created, Status).
+2. The reply reports the outcome of the Phase 3: Update — success or
+   failure of the PERSONAL.md write, the memory-file writes, and the
+   `yoker:git` commit+push. Any error encountered during Phase 3: Update
+   is surfaced in the reply (not swallowed).
+3. Call `yoker_assistant:md_to_html` to convert the markdown reply to HTML.
+4. The HTML string is the reply body — `Agent.process()` returns it and
+   Python emails it verbatim.
 ```
 
 ## Categorization Rules
@@ -126,7 +173,7 @@ Each incoming email is the next user message in the ongoing session
 Look for project indicators:
 - Explicit prefix: "project-name:"
 - Context clues: File paths, component names
-- Known projects from CLAUDE.md files
+- Known projects from project guidance files (CLAUDE.md, AGENTS.md) if present
 
 ### Clarity Assessment
 
@@ -223,6 +270,8 @@ Reply via email with your clarifications.
 | TODO.md missing | Create with template |
 | Ambiguous item | Add to clarification list |
 
+**Note:** PERSONAL.md missing is NOT an error — it triggers the Phase 1: Initialize bootstrap flow, not the error table.
+
 ## Memory Instructions
 
 **Update your agent memory** as you discover:
@@ -238,7 +287,7 @@ Store these in memory files under `memory/` with type `project` or `feedback`.
 
 Identity and personal context should be configured in:
 - `PERSONAL.md` — In the working directory, contains user identity, goals, and learned behaviors
-- Project `CLAUDE.md` files — Project-specific guidance
+- Project guidance files (e.g. CLAUDE.md, AGENTS.md) — Project-specific guidance, if present (optional; these may not exist)
 - Memory files — Discovered knowledge over time
 
 **PERSONAL.md Structure:**
@@ -250,7 +299,7 @@ Identity and personal context should be configured in:
 - User name and preferred address
 - Website and project context
 
-## Eira
+## <Agent Name>
 - Your identity and how you should present yourself
 
 ## When Sending Emails
