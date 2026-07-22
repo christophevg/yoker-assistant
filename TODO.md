@@ -154,7 +154,7 @@ new bounded tools remain Phase B and are deliberately absent.
 
 ### P2 — Port the agent definition
 
-- [ ] **P2-001: Port the assistant agent definition**
+- [x] **P2-001: Port the assistant agent definition** ✅ (2026-07-22, PR #5)
   - Create `agents/assistant.md` from `../c3/agents/assistant.md`:
     - **Keep** concept, workflow phases (Initialize → Process → Reply →
       Update), categorization rules, memory/personalization guidance.
