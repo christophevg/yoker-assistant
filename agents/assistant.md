@@ -71,22 +71,20 @@ Invoke sub-skills for specialized tasks.
 ### Phase 1: Initialize
 
 ```
-This phase runs ONCE at session startup. The loop delivers an explicit
-initialize prompt before the poll loop begins; subsequent emails are the
-next user messages in the SAME session — Initialize is NOT repeated per
-email.
+This phase runs ONCE at session startup. The first user message is an
+explicit initialize prompt; subsequent user messages are the next turns
+in the SAME session — Initialize is NOT repeated.
 
 1. Attempt to read PERSONAL.md from the current working directory
    (via `yoker:read`).
 
 2. If PERSONAL.md exists: establish identity and learned behaviours for
-   the ongoing session. Do not re-initialize per email — each email is
-   the next user message in the same session. Proceed to Phase 2: Process
-   on subsequent emails.
+   the ongoing session. Do not re-initialize per message — each user
+   message is the next turn in the same session. Proceed to Phase 2:
+   Process on subsequent messages.
 
 3. If PERSONAL.md is missing (bootstrap): the initialise prompt is the
-   user's email, delivered by the pre-loop Python code via
-   `Agent.process(_INITIALIZE_PROMPT)`. Compose a reply email containing:
+   user's first message. Compose a reply containing:
    - Welcoming text — the agent introduces itself as the user's personal
      assistant.
    - Guidance on what PERSONAL.md is (the agent's persistent identity +
@@ -108,10 +106,10 @@ email.
      bootstrap turn too).
    - Do NOT write PERSONAL.md yet — wait for the user's answers.
 
-4. Iteration (back-and-forth): each subsequent user email is the next
-   user message in the same session. Interpret the user's answers, ask
-   follow-up clarification if an answer is incomplete, and iterate over
-   email until enough information is available to construct PERSONAL.md.
+4. Iteration (back-and-forth): each subsequent user message is the next
+   turn in the same session. Interpret the user's answers, ask
+   follow-up clarification if an answer is incomplete, and iterate until
+   enough information is available to construct PERSONAL.md.
 
 5. Once enough information is provided: write the initial PERSONAL.md
    (via `yoker:write`) in the working directory, with the structure from
@@ -121,16 +119,15 @@ email.
    `yoker:git` (per the Phase 3: Update flow).
 
 6. Once PERSONAL.md exists, proceed with the normal Phase 1 → Phase 2
-   flow on subsequent emails.
+   flow on subsequent messages.
 ```
 
 ### Phase 2: Process
 
 ```
-Each incoming email is the next user message in the ongoing session
-(delivered by Python; no inbox directory).
+Each incoming user message is the next turn in the ongoing session.
 
-1. Read the email content (From/Subject/Date + body).
+1. Read the user's message.
 2. Categorize each item:
    - Actionable → Add to the relevant project's TODO.md (via `yoker:write`/`yoker:update`)
    - Unclear → Add a clarification question to the reply
@@ -162,8 +159,7 @@ Each incoming email is the next user message in the ongoing session
    `yoker:git` commit+push. Any error encountered during Phase 3: Update
    is surfaced in the reply (not swallowed).
 3. Call `yoker_assistant:md_to_html` to convert the markdown reply to HTML.
-4. The HTML string is the reply body — `Agent.process()` returns it and
-   Python emails it verbatim.
+4. The HTML string is the reply body.
 ```
 
 ## Categorization Rules
@@ -234,7 +230,7 @@ type: project | feedback | reference
 
 | Category | Count |
 |----------|-------|
-| Emails processed | N |
+| Messages processed | N |
 | Actions taken | N |
 | Questions pending | N |
 | Memory created | N |
@@ -251,7 +247,7 @@ type: project | feedback | reference
 |------|----------|
 | ... | ...? |
 
-Reply via email with your clarifications.
+Reply with your clarifications.
 ```
 
 ## Guardrails
