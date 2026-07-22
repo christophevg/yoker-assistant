@@ -192,28 +192,41 @@ new bounded tools remain Phase B and are deliberately absent.
 
 ### P2 — Port the skills
 
-- [ ] **P2-002: Port pa-inbox skill (reworked)**
-  - Create `skills/pa-inbox/SKILL.md` from `../c3/skills/pa-inbox/SKILL.md`:
-    - **Keep** item categorization rules, project detection, clarity
-      indicators, memory integration.
-    - **Remove** all file I/O steps (list `inbox/`, move to `inbox/archive/`,
-      write `outbox/` files, `re-` naming).
-    - **Rework** the workflow to: given the email content in the handoff,
-      categorize each item, take actions with the agent's tools, and produce
-      reply content. No mailbox mechanics.
-  - **Acceptance:** skill loads under `yoker:skill`; body references no
-    `inbox/` or `outbox/` directories.
-  - **Satisfies:** port skills
+- [ ] **P2-002: Evaluate pa-inbox concepts and optionally split off skill sub-workflows**
+  - **NOT a port.** The old `../c3/skills/pa-inbox/SKILL.md` is "old" — it
+    targets the old assistant operating with an `inbox/` folder and files,
+    before the assistant had access to an actual email account. Evaluate the
+    concepts captured in it (item categorization rules, project detection,
+    clarity indicators, memory integration) and consider which are
+    applicable to the new assistant agent's definition to improve it.
+    Optionally, split off parts of the new agent definition into on-demand
+    skill sub-workflows to simplify it and to separate optional paths in
+    the workflow into on-demand skill sub-workflows.
+  - **To be considered at that time** — this task is in the backlog; the
+    evaluation happens when this task is picked up, not now.
+  - **Acceptance:** the evaluation is documented (which concepts apply, which
+    don't, and why); any skill sub-workflow split off from the agent
+    definition loads under `yoker:skill`; the agent definition is simplified
+    where applicable.
+  - **Satisfies:** port skills (reframed as evaluation)
 
-- [ ] **P2-003: Port pa-outbox skill (reworked)**
-  - Create `skills/pa-outbox/SKILL.md` from `../c3/skills/pa-outbox/SKILL.md`:
-    - **Keep** reply format (Actions Taken, Memory Created, Status, Pending
-      Questions), clarification vs resolution reply types.
-    - **Remove** outbox file writing, archive management, markdown-to-HTML
-      conversion.
-  - **Acceptance:** skill loads; the agent's reply text follows the kept
-    format; no filesystem reply-writing instructions.
-  - **Satisfies:** port skills
+- [ ] **P2-003: Evaluate pa-outbox concepts and optionally split off skill sub-workflows**
+  - **NOT a port.** The old `../c3/skills/pa-outbox/SKILL.md` is "old" — it
+    targets the old assistant's file-based outbox workflow. Evaluate the
+    concepts captured in it (reply format: Actions Taken, Memory Created,
+    Status, Pending Questions; clarification vs resolution reply types) and
+    consider which are applicable to the new assistant agent's definition
+    to improve it. Optionally, split off parts of the new agent definition
+    (e.g. the reply-format guidance) into an on-demand skill sub-workflow
+    to simplify the agent definition and separate optional paths in the
+    workflow into on-demand skill sub-workflows.
+  - **To be considered at that time** — this task is in the backlog; the
+    evaluation happens when this task is picked up, not now.
+  - **Acceptance:** the evaluation is documented (which concepts apply, which
+    don't, and why); any skill sub-workflow split off from the agent
+    definition loads under `yoker:skill`; the agent definition is simplified
+    where applicable.
+  - **Satisfies:** port skills (reframed as evaluation)
 
 - [ ] **P2-004: Record decision to drop pa-session**
   - Decision: DROP `pa-session` entirely. yoker's persistent context manager
