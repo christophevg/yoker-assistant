@@ -1,118 +1,86 @@
-# Plan — P4-001: Tutorial README
+# Plan — P4-001: Tutorial (README front-door + docs/ full narrative)
 
-## P4-001 acceptance criteria (verbatim from TODO.md)
+## Owner feedback (verbatim, PR #9)
 
-> Per STANDARDS.md doc voice: a reader follows the journey from empty repo
-> to working package and understands each decision. Cover: why this exists
-> (c3 heritage, the email-loop-moved-to-Python insight), the two halves
-> (Python loop vs agent reasoning), the yoker SDK seam, the simple-email-gw
-> seam, the handoff contract, the bounded tool set and the safety model,
-> configuration, running it, the c3 → yoker-assistant porting map.
+> I disagree. The tutorial aspect of this project is important. I consider a
+> README file like a front-door, it sets you up with what you minimally need.
+> The tutorial should be all-inclusive and not a reduced set of links. It
+> should really be a narrative on its own.
 >
-> **Persistent-session architecture:** explain the one long-lived agentic
-> session — Agent constructed once at startup with a persistent context
-> manager, each email delivered as the next user message, continuity living
-> in the session plus memory files and `PERSONAL.md`.
+> Why isn't our normal approach to create end-user documentation in a `docs/`
+> folder, published to readthedocs, not considered?
 >
-> **Custom md→html tool story:** explain creating your own bounded tool —
-> the `yoker_assistant:md_to_html` converter as a yoker plugin/tool defined
-> in this package — pairing with yoker's built-in curated tools to
-> demonstrate both halves of yoker's tool model. HTML replies (not plain
-> text) because markdown and email do not render well together.
+> I'd consider this the place where all user documentation is created in
+> full, including the tutorial. The README can then references those pages -
+> which would also work from PyPi where the README is included, but references
+> to files in the repo don't work.
 >
-> **Dual-mode architecture:** cover the three-layer tool model — the
-> package is simultaneously a consumer of yoker's built-in curated tools,
-> a provider of its own named safe tool (`yoker_assistant:md_to_html`),
-> and a reusable plugin any external yoker consumer can load. Explain the
-> self-trust requirement for unattended operation (no TTY to prompt —
-> the trust gate rejects untrusted plugins in non-interactive mode) and
-> that self-consumption and third-party consumption use the identical
-> mechanism (`pip install yoker-assistant` + `[plugins]` /
-> `[plugins.trusted]` in `yoker.toml`).
->
-> **Git commit/push demo beat:** document the visible "acts on behalf of
-> the owner" moment — the agent learns a behaviour, writes `PERSONAL.md`,
-> commits, and pushes via full `yoker:git` (bounded tools, not a shell).
->
-> **Recipient safety:** document that it is a `simple-email-gw` config
-> option (`EMAIL_RECIPIENT_WHITELIST_ADDRESSES`), not package code.
->
-> **Security configuration subsection (security-engineer recommendation):**
-> include a short "Security configuration" section covering: (a) the
-> self-trust blast radius — marking `[plugins.trusted] yoker_assistant =
-> true; pkgq = true` admits ALL tool code from those packages as trusted
-> with no per-call gate, so users must pin the installed version
-> (`uv pip install yoker-assistant==<version>`) and verify the source;
-> (b) the correct env var name
-> `EMAIL_RECIPIENT_WHITELIST_ADDRESSES` as the primary reply-safety
-> boundary — it must be set to the single owner address or the agent
-> could reply to arbitrary senders; the whitelist is silently disabled
-> if unset/wrong (reply-to-arbitrary-senders risk); (c) the rule that
-> `~/.yoker.toml` and `.env` are NEVER committed (`.env` is already
-> gitignored; a user who snapshots `~/.yoker.toml` into a repo must
-> gitignore it too).
->
-> Use `c3:readme` for structure and badges.
->
-> **Acceptance:** README tells the build story end-to-end; a new reader can
-> set it up and run `python -m yoker_assistant --once`; the porting map is
-> explicit about kept/removed/reworked; the persistent-session
-> architecture, the custom-tool story, and the git demo beat are each
-> explained as build decisions.
+> So, please consider this approach. If this wasn't clear from our standard
+> project setup procedures, we need to improve this. I consider it an
+> integral part of all of our projects.
 
-## Decision: expand the existing README.md
+## Research findings
 
-**New file vs. expand existing README.md → expand existing.**
+### The c3 standard IS clear and was missed in the original plan
 
-Reasons:
-- The acceptance criteria say "Write the tutorial README" (singular) and
-  "the README links to it from the Security configuration subsection"
-  (already done in Bucket A — `README.md` references `SECURITY.md`).
-- `analysis/functional.md` §5.2 already promises "A full tutorial is in
-  P4-001" and points readers at the README. Adding a second top-level doc
-  splits the story across files and violates the Simplicity Principle.
-- The current README is intentionally thin (~96 lines, "Skeleton" status).
-  P4-001 is the task that graduates it to the full tutorial. Keeping a
-  separate lean README AND a TUTORIAL.md would create two entry points
-  competing for the same reader — exactly the indirection the Simplicity
-  Principle rejects.
-- `c3:readme` (the mandated structure skill) treats README.md as the
-  primary project README; introducing a separate TUTORIAL.md would be a
-  second convention not sanctioned by the skill.
+There is a clear, documented standard for `docs/` + ReadTheDocs across the c3
+ecosystem. The original P4-001 plan did not apply it — this is the gap the
+owner flagged.
 
-**Consequence:** the existing sections (Quick start, Configuration,
-Security configuration, License) are preserved and folded into the
-tutorial's narrative order. The "Skeleton" Status line is updated to
-reflect that the build is implemented (P1–P3 done).
+**1. `c3:documentation` skill** (`/Users/xtof/Workspace/agentic/c3/skills/documentation/SKILL.md`):
+- Mandates Sphinx for publication on readthedocs.org.
+- Defines the docs/ structure: `docs/conf.py`, `docs/index.md`,
+  `docs/installation.md`, `docs/quickstart.md`, `docs/api/`,
+  `docs/development/changelog.md`, `docs/Makefile`, `docs/requirements.txt`.
+- Specifies the standard `conf.py` (extensions: `myst_parser`, `autodoc`,
+  `autosummary`, `napoleon`, `viewcode`, `intersphinx`; theme:
+  `sphinx_rtd_theme`).
+- Specifies `make docs` (using `uv run sphinx-build`) as the build command.
 
-## What NOT to duplicate
+**2. `end-user-documenter` agent** (`/Users/xtof/Workspace/agentic/c3/agents/end-user-documenter.md`):
+- Defines documentation types explicitly: README.md (concise front-door, use
+  `c3:readme`), **docs/ (the Read the Docs folder — "should contain everything
+  for every audience")**, DEVELOPMENT.md, PACKAGE.md, LICENSE,
+  examples/README.md.
+- Output structure: `.readthedocs.yaml` + `docs/{conf.py, index, api,
+  examples, installation, quick-start, usage, features/, assets/}`.
+- Content in Markdown with `myst_parser`.
 
-The README is the *story*. The analysis document is the *spec*. Cross-
-reference, do not copy:
+**3. Existing projects confirm the standard** — 10 sibling projects use the
+same Sphinx + `.readthedocs.yaml` + `sphinx_rtd_theme` + `myst_parser` setup:
+baseweb, bpmn-tools, clevis, clitic, maaltafels, oatk, roomz, simple-email-gw,
+yoker, yoker-chat. Reference implementation: `/Users/xtof/Workspace/agentic/yoker/docs/`
+(sibling project — same author, same stack, same toolchain).
 
-- `analysis/functional.md` §2 (full architecture) → README tells the
-  narrative version; links to §2 for the full seam-by-seam spec.
-- `analysis/functional.md` §3 (full porting map) → README shows the
-  condensed table (kept/removed/reworked/dropped/added verdicts only);
-  links to §3 for the per-element rationale.
-- `analysis/functional.md` §4 (handoff contract) → README shows the
-  payload format snippet and the four-way branch one-liner; links to §4
-  for the full ordering/idempotency discussion.
-- `SECURITY.md` (manifest review process) → README's Security
-  configuration subsection links to it (already done in Bucket A).
-- `analysis/functional.md` §7 (loop behavior) → README shows the per-
-  iteration bullet list; links to §7 for the full error-handling table.
+**4. The yoker-assistant Makefile already has the standard `docs` and
+`docs-view` targets** (from `c3:python-project`):
+```
+docs: env-dev ## Build HTML documentation
+	cd docs && uv run sphinx-build -M html . _build
+docs-view: docs ## Build and open documentation in browser
+	open docs/_build/html/index.html
+```
+So the build plumbing is already in place — only the `docs/` content and the
+`.readthedocs.yaml` config are missing.
 
-The README does NOT re-explain: context-window management (out of scope
-by design — §8 Q11), attachment handling (out of scope), batch
-processing, multi-account support — these are listed under "Out of
-scope (first pass)" with a one-line pointer to TODO.md "Unsorted".
+**Conclusion:** The standard exists and is well-defined. The original plan
+missed it. The revised plan below applies it.
 
-## Proposed structure (section outline)
+### Tool choice
 
-Target length: 450–600 lines (tight tutorial, not a tome). Code
-snippets are short (5–15 lines each) and point at the real source files
-for the full version.
+**Sphinx + MyST + `sphinx_rtd_theme` + ReadTheDocs.** This is the uniform
+standard across all 10 sibling projects and both c3 skills. MkDocs is not
+used anywhere in the ecosystem.
+
+## Revised plan
+
+### A. README.md — lean front-door
+
+Per owner: "a front-door, it sets you up with what you minimally need." Per
+`c3:readme`: concise, just enough to get started, with examples and badges.
+Per PyPI constraint: links must work on PyPI (where repo-relative file links
+do NOT work) — so all cross-references to docs content use absolute
+ReadTheDocs URLs (or the ReadTheDocs project URL once configured).
 
 ```
 # yoker-assistant
@@ -125,304 +93,423 @@ for the full version.
 <updated from "Skeleton" to "First pass implemented (P1–P3).">
 <one line pointing at TODO.md for the remaining backlog.>
 
-## Why this exists
-
-<c3 heritage in three paragraphs: the c3 assistant runs inside Claude
- Code and polls email via an MCP server. The insight: the email loop is
- cheap structured work that should live in Python, not in the agent.
- The port moves the loop out and leaves the agent to do what it is good
- at — reasoning. Link to functional.md §1 for the full project overview.>
-
-## The two halves
-
-<the central design idea: Python owns the structured loop (poll, fetch,
- reply, archive), the agent owns the reasoning (categorize, act,
- compose). No agent cost on polling; no Python cost on reasoning. The
- seam between them is the loop module itself — there is no Mailbox
- wrapper class (descoped per owner feedback in P1-003). A simple
- ASCII diagram showing the loop and the agent split, with the handoff
- arrow between them.>
-
-## The seams
-
-### The yoker SDK seam
-
-<5-line code snippet from loop.py showing `Session(config,
- session_id=...)` and `agent.process(message)`. One paragraph: yoker
- is a library-first, async, event-driven agent harness. The Agent is
- resolved by name (`yoker_assistant:assistant`) from the Session's
- plugin-loaded registry — no manual loader, no file path that breaks
- on install. Link to functional.md §2.3 for the full SDK surface.>
-
-### The simple-email-gw seam
-
-<5-line code snippet from loop.py showing `get_pool()` +
- `imap.connect()` + `imap.search("INBOX", "UNSEEN")`. One paragraph:
- the loop calls `IMAPClient`/`SMTPClient` directly (no wrapper), with
- `connect()`/`disconnect()` bookending each iteration — an idle
- connection across the multi-minute poll interval would just time
- out. Link to functional.md §2.4 for the connection-lifetime
- rationale.>
-
-## The handoff contract
-
-<the payload format — From/Subject/Date + body, no instructions block,
- shown as a fenced text block. The four-way branch on the agent's
- reply, as a 4-bullet list: {{NO_REPLY}} / empty / unsafe HTML / valid
- HTML — with one line each on what the loop does. Note that every
- send is a reply (always `reply_email`, no `send_email` fallback).
- Link to functional.md §4 for the full ordering/idempotency
- discussion.>
-
-## The bounded tool set
-
-<the curated tool list from assistant.md `tools:` frontmatter as a
- short table: tool | purpose. One paragraph on the safety model:
- named, guardrailed tools, no open shell — this is what the showcase
- demonstrates (Bash removed, AskUserQuestion/PushNotification/MCP
- removed). Link to functional.md §3.3 for the per-tool porting
- rationale.>
-
-## The c3 → yoker-assistant porting map
-
-<condensed table — five rows: KEPT / REMOVED / REWORKED / DROPPED /
- ADDED — with one-line summary and a few example elements each. Link
- to functional.md §3 for the full per-element map. State the
- adaptation principle in one sentence: keep the concepts, rework the
- mechanics.>
-
-## The persistent-session architecture
-
-<the one long-lived agentic session: Agent constructed ONCE at
- startup with a persistent context manager; one-time Initialize turn
- (agent reads PERSONAL.md via `yoker:read`); each email is the next
- user message in that SAME session; continuity lives in the session
- plus memory files plus PERSONAL.md learned behaviours the agent
- writes. 3–4 paragraphs. Link to functional.md §2.1 and §8 Q3 for
- the resolved design questions.>
-
-## The custom md→html tool story
-
-<the showcase's "create your own bounded tool" example: a plain
- Python function in `src/yoker_assistant/tools.py`, annotated with
- yoker guardrail markers, exposed via `__YOKER_MANIFEST__` in
- `__init__.py`. 5-line code snippet of the manifest. One paragraph on
- why HTML (markdown and email do not render well together). One
- paragraph on why this is the second half of yoker's tool model —
- using built-ins AND authoring your own. Link to functional.md
- §2.3.1 and §3.3.>
-
-## Dual-mode architecture
-
-<the three-layer tool model in one paragraph + one short bullet list:
- (1) consumer of yoker's built-in curated tools, (2) provider of its
- own named safe tool `yoker_assistant:md_to_html`, (3) reusable
- plugin any external yoker consumer can load. The self-trust
- requirement: with no TTY to prompt, yoker's trust gate rejects
- untrusted plugins in non-interactive mode — `[plugins.trusted]
- yoker_assistant = true` is required. Self-consumption and
- third-party consumption use the identical mechanism
- (`pip install yoker-assistant` + the same two `[plugins]` /
- `[plugins.trusted]` lines). Link to functional.md §2.3.1 and §8.1.>
-
-## The git commit/push demo beat
-
-<the visible "acts on behalf of the owner" moment, as a narrative
- paragraph: the agent learns a behaviour from an email → writes it to
- PERSONAL.md via `yoker:update` → commits and pushes via `yoker:git`
- (full git, not a shell). This is the showcase's headline
- demonstration of bounded tools acting on the owner's behalf: the
- assistant autonomously maintains its own learned-behaviours file in
- version control. Note that the loop logs the user turn and the
- agent turn with `===` separators so the demo is visible at INFO
- level. Link to functional.md §4.3.>
-
-## Recipient safety
-
-<one short paragraph: reply safety is a `simple-email-gw` config
- option (`EMAIL_RECIPIENT_WHITELIST_ADDRESSES`), not package code.
- The loop refuses to start if the whitelist is disabled (C1 blocking
- fix — fails open otherwise). Set the whitelist to the single owner
- address; leaving it broad lets the agent reply to arbitrary
- senders. The whitelist is silently disabled if unset/wrong. Link
- to functional.md §5.3 and §7.>
-
 ## Quick start
 
 <kept from current README: `make env-dev`, `make test`,
- `python -m yoker_assistant --once`. Add one line: `--once` processes
- one iteration and exits (useful for demos/tests). Add a one-line
- note on backend prerequisite: yoker needs a configured backend in
- `~/.yoker.toml` (Ollama local, or a cloud API key) — this is a
- deployment prerequisite, not a code concern.>
+ `python -m yoker_assistant --once`. One line on `--once` (demo/test). One
+ line on backend prerequisite: configured `~/.yoker.toml` backend (Ollama or
+ cloud API key).>
 
 ## Configuration
 
-<kept from current README — the two subsections `~/.yoker.toml` and
- `.env` are preserved as-is. They already cover the plugin
- registration, self-trust, and the recipient whitelist. Add a one-
- line cross-reference to the Security configuration subsection below
- for the blast-radius discussion, and to `yoker.toml.example` /
- `.env.example` for the reference templates.>
+<condensed: the two `~/.yoker.toml` and `.env` subsections are trimmed to the
+ minimum the user needs to start. Point at the Configuration page in the
+ docs for the full detail and at `yoker.toml.example` / `.env.example` for
+ the reference templates.>
 
 ## Security configuration
 
-<kept from current README (Bucket A) — already covers (a) the
- self-trust blast radius with version-pinning advice, (b) the
- `EMAIL_RECIPIENT_WHITELIST_ADDRESSES` env var as the primary reply-
- safety boundary, (c) the `make pre-publish` guard. Add one bullet:
- `~/.yoker.toml` and `.env` are NEVER committed (`.env` is already
- gitignored; a user who snapshots `~/.yoker.toml` into a repo must
- gitignore it too). This satisfies the third requirement of the
- security-engineer recommendation. Link to `SECURITY.md` for the
- manifest-addition review process (already linked).>
+<kept from current README (Bucket A) — already covers (a) the self-trust
+ blast radius with version-pinning advice, (b) `EMAIL_RECIPIENT_WHITELIST_…
+ ADDRESSES` as the primary reply-safety boundary, (c) the `make pre-publish`
+ guard. Add the new bullet: `~/.yoker.toml` and `.env` are NEVER committed.
+ This section stays in the README because it is front-door-critical: a user
+ who gets it wrong creates a reply-to-arbitrary-senders or
+ trust-any-version risk on first run. Link to SECURITY.md (already linked)
+ and to the Security page in the docs for the manifest review process.>
 
 ## Running it
 
-<one short section: `python -m yoker_assistant` (long-running) vs
- `python -m yoker_assistant --once` (one iteration). SIGINT/SIGTERM
- graceful shutdown. The loop logs the user turn and the agent turn
- at INFO level so you can watch it work. One paragraph on what to
- expect the first time (the bootstrap flow when PERSONAL.md is
- missing — the agent asks the owner questions to construct it).>
+<one short section: long-running vs `--once`, SIGINT/SIGTERM graceful
+ shutdown, what to expect the first time (PERSONAL.md bootstrap).>
 
-## Out of scope (first pass)
+## Documentation
 
-<short bullet list with one-line pointers to TODO.md "Unsorted":
- HTML styling polish, attachment handling, batch processing,
- multi-account support, `make run-demo` target. One sentence each,
- no detail.>
+<the front-door hand-off: one paragraph pointing at the full docs on
+ ReadTheDocs — the tutorial, the architecture, the porting map, the
+ build-decision stories. This is the single link that carries the tutorial
+ load. Uses an absolute ReadTheDocs URL so it works on PyPI.>
 
 ## License
 
 <kept: MIT.>
 ```
 
-## Diagrams and code snippets
+**Target length: 120–180 lines.** The README is intentionally NOT a
+narrative — it is the front-door. The narrative lives in `docs/`.
 
-**Diagrams** (one, ASCII, ~10 lines):
-- The two-halves split: Python loop on the left, agent on the right,
-  handoff arrow between them. Shows poll/fetch/reply/archive on the
-  Python side and categorize/act/compose on the agent side. The seam
-  is the handoff arrow. No mermaid, no images — ASCII keeps the README
-  portable and avoids the relative-image-path pre-publish guard.
+### B. docs/ folder — full all-inclusive tutorial narrative
 
-**Code snippets** (short, illustrative, pointing at real source):
-1. `__init__.py` manifest (3 lines) — for the custom-tool story.
-2. `loop.py` `Session` construction (3 lines) — for the yoker SDK seam.
-3. `loop.py` `get_pool` + `imap.connect` (3 lines) — for the simple-
-   email-gw seam.
-4. The handoff payload format (4 lines, fenced text) — for the handoff
-   contract.
-5. The `tools:` frontmatter from `assistant.md` (12 lines) — for the
-   bounded tool set.
-6. The `~/.yoker.toml` plugin block (already in README, kept).
+Per owner: "all-inclusive and not a reduced set of links. It should really
+be a narrative on its own." The tutorial is the centerpiece; supporting
+pages hold the architecture/porting/security detail so the tutorial itself
+stays readable.
 
-No snippet is longer than ~12 lines. Each links to the source file for
-the full version.
+**File structure** (mirrors the `end-user-documenter` + `c3:documentation`
+standard, adapted to this project):
 
-## Cross-references (link inventory)
+```
+docs/
+  conf.py              # Sphinx config (standard, see below)
+  index.md             # toctree + project intro
+  installation.md      # full install (deps, backend, plugin registration)
+  quickstart.md        # first-run walkthrough (run --once, watch logs)
+  tutorial.md          # THE narrative — full build story end-to-end
+  architecture.md      # two halves, seams, handoff contract, bounded tools,
+                       # persistent-session, dual-mode, custom tool
+  porting-map.md       # c3 → yoker-assistant full per-element table
+  security.md          # full security configuration + recipient safety
+  configuration.md      # full ~/.yoker.toml + .env reference
+  api.md               # public API surface (loop, tools manifest)
+  changelog.md         # development/changelog.md per keep-a-changelog
+  Makefile             # standard Sphinx Makefile (optional — root Makefile
+                       #   already provides `make docs`)
+  requirements.txt     # sphinx, myst_parser, sphinx_rtd_theme
+```
 
-From the README to:
-- `analysis/functional.md` §1 (project overview) — from "Why this exists"
-- `analysis/functional.md` §2.1 (loop) — from "Persistent-session
-  architecture"
-- `analysis/functional.md` §2.3 (yoker SDK seam) — from "The yoker SDK
-  seam"
-- `analysis/functional.md` §2.3.1 (dual-mode) — from "Dual-mode
-  architecture" and "The custom md→html tool story"
-- `analysis/functional.md` §2.4 (simple-email-gw seam) — from "The
-  simple-email-gw seam"
-- `analysis/functional.md` §3 (porting map) — from "The c3 →
-  yoker-assistant porting map"
-- `analysis/functional.md` §3.3 (bounded tool set) — from "The bounded
-  tool set"
-- `analysis/functional.md` §4 (handoff contract) — from "The handoff
-  contract"
-- `analysis/functional.md` §4.3 (demo beat) — from "The git commit/push
-  demo beat"
-- `analysis/functional.md` §5.3 (recipient safety) — from "Recipient
-  safety"
-- `analysis/functional.md` §7 (loop behavior) — from "Running it"
-- `analysis/functional.md` §8 Q3 (persistent session resolution) — from
-  "The persistent-session architecture"
-- `analysis/functional.md` §8.1 (dual-mode summary) — from "Dual-mode
-  architecture"
-- `SECURITY.md` — from "Security configuration" (already linked)
-- `TODO.md` — from "Status" and "Out of scope"
-- `yoker.toml.example`, `.env.example` — from "Configuration"
-- `src/yoker_assistant/__init__.py`, `loop.py`, `tools.py`,
-  `agents/assistant.md` — from the relevant code snippets
+**`docs/conf.py`** (standard, per `c3:documentation` skill + yoker sibling):
 
-## Acceptance criteria coverage map
+```python
+"""Sphinx configuration for yoker-assistant documentation."""
 
-| Acceptance criterion | README section |
+project = "yoker-assistant"
+copyright = "2026, Christophe VG"
+author = "Christophe VG"
+
+extensions = [
+  "myst_parser",
+  "sphinx.ext.autodoc",
+  "sphinx.ext.napoleon",
+  "sphinx.ext.viewcode",
+  "sphinx.ext.intersphinx",
+]
+
+templates_path = ["_templates"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+
+html_theme = "sphinx_rtd_theme"
+html_static_path = ["_static"]
+
+myst_enable_extensions = ["colon_fence", "deflist"]
+
+intersphinx_mapping = {
+  "python": ("https://docs.python.org/3", None),
+}
+```
+
+### C. docs/index.md — toctree
+
+```
+# yoker-assistant
+
+<one-paragraph project intro — same tagline as README.>
+
+## Contents
+
+```{toctree}
+:maxdepth: 2
+
+installation
+quickstart
+tutorial
+architecture
+porting-map
+security
+configuration
+api
+changelog
+```
+```
+
+### D. docs/tutorial.md — the full narrative
+
+This is the centerpiece. All-inclusive, full prose, not a reduced set of
+links. It tells the build story end-to-end so a reader can follow the
+journey from empty repo to working package and understand each decision.
+
+Section outline (each section is full prose, not cross-references):
+
+1. **Why this exists** — c3 heritage in full: the c3 assistant runs inside
+   Claude Code and polls email via an MCP server. The insight: the email
+   loop is cheap structured work that should live in Python, not in the
+   agent. The port moves the loop out and leaves the agent to do what it
+   is good at — reasoning. (3–4 paragraphs.)
+
+2. **The two halves** — the central design idea: Python owns the
+   structured loop (poll, fetch, reply, archive), the agent owns the
+   reasoning (categorize, act, compose). No agent cost on polling; no
+   Python cost on reasoning. The seam between them is the loop module
+   itself — no Mailbox wrapper (descoped per owner feedback in P1-003).
+   One ASCII diagram showing the loop and the agent split, with the
+   handoff arrow between them.
+
+3. **The seams**
+   - **The yoker SDK seam** — 5-line code snippet from `loop.py` showing
+     `Session(config, session_id=...)` and `agent.process(message)`. One
+     paragraph: yoker is a library-first, async, event-driven agent
+     harness. The Agent is resolved by name from the Session's plugin-loaded
+     registry — no manual loader, no file path that breaks on install.
+   - **The simple-email-gw seam** — 5-line snippet from `loop.py` showing
+     `get_pool()` + `imap.connect()` + `imap.search("INBOX", "UNSEEN")`.
+     One paragraph: the loop calls `IMAPClient`/`SMTPClient` directly (no
+     wrapper), with `connect()`/`disconnect()` bookending each iteration
+     — an idle connection across the multi-minute poll interval would just
+     time out.
+
+4. **The handoff contract** — the payload format (From/Subject/Date + body,
+   no instructions block) as a fenced text block. The four-way branch on
+   the agent's reply as a 4-bullet list: `{{NO_REPLY}}` / empty / unsafe
+   HTML / valid HTML — one line each on what the loop does. Every send is
+   a reply (always `reply_email`, no `send_email` fallback). Full ordering
+   and idempotency discussion lives here (moved out of functional.md §4
+   — the tutorial is the canonical place; functional.md keeps the spec).
+
+5. **The bounded tool set** — the curated tool list from `assistant.md`
+   `tools:` frontmatter as a short table: tool | purpose. One paragraph on
+   the safety model: named, guardrailed tools, no open shell (Bash removed,
+   AskUserQuestion/PushNotification/MCP removed).
+
+6. **The c3 → yoker-assistant porting map** — the full per-element table
+   here (KEPT / REMOVED / REWORKED / DROPPED / ADDED), with one-line
+   rationale per element. The adaptation principle stated once: keep the
+   concepts, rework the mechanics. (The condensed verdict table from the
+   original plan goes in the README; the full table goes here.)
+
+7. **The persistent-session architecture** — the one long-lived agentic
+   session: Agent constructed ONCE at startup with a persistent context
+   manager; one-time Initialize turn (agent reads `PERSONAL.md` via
+   `yoker:read`); each email is the next user message in that SAME session;
+   continuity lives in the session plus memory files plus `PERSONAL.md`
+   learned behaviours the agent writes. 3–4 paragraphs.
+
+8. **The custom md→html tool story** — the showcase's "create your own
+   bounded tool" example: a plain Python function in
+   `src/yoker_assistant/tools.py`, annotated with yoker guardrail markers,
+   exposed via `__YOKER_MANIFEST__` in `__init__.py`. 5-line code snippet
+   of the manifest. One paragraph on why HTML (markdown and email do not
+   render well together). One paragraph on why this is the second half of
+   yoker's tool model — using built-ins AND authoring your own.
+
+9. **Dual-mode architecture** — the three-layer tool model in one
+   paragraph + one short bullet list: (1) consumer of yoker's built-in
+   curated tools, (2) provider of its own named safe tool
+   `yoker_assistant:md_to_html`, (3) reusable plugin any external yoker
+   consumer can load. The self-trust requirement: with no TTY to prompt,
+   yoker's trust gate rejects untrusted plugins in non-interactive mode —
+   `[plugins.trusted] yoker_assistant = true` is required. Self-consumption
+   and third-party consumption use the identical mechanism.
+
+10. **The git commit/push demo beat** — the visible "acts on behalf of
+    the owner" moment, as a narrative paragraph: the agent learns a
+    behaviour from an email → writes it to `PERSONAL.md` via
+    `yoker:update` → commits and pushes via `yoker:git` (full git, not a
+    shell). This is the showcase's headline demonstration of bounded tools
+    acting on the owner's behalf: the assistant autonomously maintains its
+    own learned-behaviours file in version control. The loop logs the
+    user turn and the agent turn with `===` separators so the demo is
+    visible at INFO level.
+
+11. **Recipient safety** — one short paragraph: reply safety is a
+    `simple-email-gw` config option
+    (`EMAIL_RECIPIENT_WHITELIST_ADDRESSES`), not package code. The loop
+    refuses to start if the whitelist is disabled (C1 blocking fix — fails
+    open otherwise). Set the whitelist to the single owner address;
+    leaving it broad lets the agent reply to arbitrary senders. The
+    whitelist is silently disabled if unset/wrong.
+
+12. **Out of scope (first pass)** — short bullet list with one-line
+    pointers to TODO.md "Unsorted": HTML styling polish, attachment
+    handling, batch processing, multi-account support, `make run-demo`
+    target.
+
+**Target length: 600–800 lines for `tutorial.md`.** No hard cap — the
+tutorial is explicitly all-inclusive per the owner's directive. The
+supporting pages (`architecture.md`, `porting-map.md`, `security.md`,
+`configuration.md`) hold the long-form reference material so the tutorial
+itself can flow as a narrative.
+
+### E. Supporting docs pages (outline only)
+
+- **`installation.md`** — full install: uv, `make env-dev`, backend
+  prerequisite (Ollama local OR cloud API key), `~/.yoker.toml` plugin
+  registration block, `[plugins.trusted]` self-trust, `.env` with
+  `EMAIL_RECIPIENT_WHITELIST_ADDRESSES`. Reference templates:
+  `yoker.toml.example`, `.env.example`.
+- **`quickstart.md`** — first-run walkthrough: `python -m
+  yoker_assistant --once`, watch the INFO logs (user turn / agent turn
+  `===` separators), the PERSONAL.md bootstrap flow on first real run.
+- **`architecture.md`** — the full seam-by-seam architecture (from
+  functional.md §2, rewritten as user documentation, not spec). Loop
+  module, yoker SDK seam, simple-email-gw seam, handoff contract,
+  persistent-session, dual-mode, custom tool — each in full.
+- **`porting-map.md`** — the full per-element c3 → yoker-assistant table
+  (from functional.md §3) with kept/removed/reworked/dropped/added
+  verdicts and rationale.
+- **`security.md`** — full security configuration: (a) self-trust blast
+  radius + version pinning, (b) `EMAIL_RECIPIENT_WHITELIST_ADDRESSES` as
+  reply-safety boundary, (c) `~/.yoker.toml` / `.env` never committed, (d)
+  the manifest-addition review process from `SECURITY.md` (linked or
+  transcluded).
+- **`configuration.md`** — full `~/.yoker.toml` and `.env` reference.
+- **`api.md`** — public API surface: the loop entrypoint, the tools
+  manifest (`__YOKER_MANIFEST__`), the `python -m yoker_assistant` CLI.
+  Uses autodoc directives where the source has docstrings.
+- **`changelog.md`** — Keep a Changelog format, seeded with the P1–P4
+  history (this can start minimal and grow; the release-manager owns it
+  going forward).
+
+### F. ReadTheDocs setup
+
+**`.readthedocs.yaml`** (standard, per sibling projects):
+
+```yaml
+# ReadTheDocs configuration
+
+version: 2
+
+build:
+  os: ubuntu-22.04
+  tools:
+    python: "3.12"
+
+sphinx:
+  configuration: docs/conf.py
+
+python:
+  install:
+    - method: pip
+      path: .
+      extra_requirements:
+        - docs
+```
+
+**`docs/requirements.txt`** (or a `docs` extra in `pyproject.toml`):
+```
+sphinx
+myst_parser
+sphinx_rtd_theme
+```
+
+**`docs/Makefile`** (optional — the root Makefile's `docs` target already
+runs `cd docs && uv run sphinx-build -M html . _build`, so a `docs/Makefile`
+is redundant; include only if `c3:documentation` skill strictly requires
+it). Decision: skip the `docs/Makefile` — the root target is already
+correct and the Simplicity Principle says no indirection.
+
+**Makefile targets**: the existing `docs` and `docs-view` targets in the
+root Makefile are already correct. No Makefile changes needed.
+
+### G. Links strategy (README → docs, works on PyPI)
+
+**PyPI constraint** (owner): "references to files in the repo don't work"
+on PyPI because the README is bundled but the repo files are not.
+
+**Strategy:**
+- All README cross-references to docs content use the **absolute ReadTheDocs
+  URL** (`https://yoker-assistant.readthedocs.io/en/latest/tutorial.html`,
+  etc.). This works identically on GitHub and on PyPI.
+- README references to repo files that are front-door-critical
+  (`yoker.toml.example`, `.env.example`, `SECURITY.md`, `TODO.md`) stay as
+  repo-relative paths — these are links a reader follows after cloning, not
+  after reading the PyPI page. (PyPI readers who want the examples get them
+  from the ReadTheDocs configuration page, which has the same content.)
+- The `Documentation` section in the README is the single hand-off: one
+  absolute ReadTheDocs link.
+- Inside `docs/`, cross-references use Sphinx/MyST relative refs
+  (`{doc}`tutorial``) — these resolve at build time and become absolute
+  URLs on ReadTheDocs.
+
+**ReadTheDocs project URL**: `yoker-assistant.readthedocs.io` (to be
+claimed on readthedocs.org; the `.readthedocs.yaml` in the repo is what
+enables the build once the project is connected). Until the project is
+connected, the absolute URLs will 404 — that is acceptable for the first
+docs PR (the owner can enable ReadTheDocs after merge).
+
+## Acceptance criteria coverage map (revised)
+
+| Acceptance criterion | Where it lives now |
 |---|---|
-| Why this exists (c3 heritage, email-loop insight) | "Why this exists" |
-| The two halves (Python loop vs agent reasoning) | "The two halves" |
-| The yoker SDK seam | "The seams → The yoker SDK seam" |
-| The simple-email-gw seam | "The seams → The simple-email-gw seam" |
-| The handoff contract | "The handoff contract" |
-| The bounded tool set and the safety model | "The bounded tool set" |
-| Configuration | "Configuration" (existing) |
-| Running it | "Quick start" + "Running it" |
-| The c3 → yoker-assistant porting map | "The c3 → yoker-assistant porting map" |
-| Persistent-session architecture | "The persistent-session architecture" |
-| Custom md→html tool story | "The custom md→html tool story" |
-| Dual-mode architecture | "Dual-mode architecture" |
-| Git commit/push demo beat | "The git commit/push demo beat" |
-| Recipient safety | "Recipient safety" |
-| Security configuration (a) blast radius + version pinning | "Security configuration" (existing) |
-| Security configuration (b) EMAIL_RECIPIENT_WHITELIST_ADDRESSES | "Security configuration" + "Recipient safety" |
-| Security configuration (c) ~/.yoker.toml/.env never committed | "Security configuration" (new bullet) |
-| Use `c3:readme` for structure and badges | Applied at implementation time |
-| New reader can set it up and run `python -m yoker_assistant --once` | "Quick start" + "Running it" + "Configuration" |
-| Porting map explicit about kept/removed/reworked | "The c3 → yoker-assistant porting map" (condensed verdict table) |
-| Persistent-session, custom-tool, git-demo each explained as build decisions | Each has its own section framed as a decision |
+| Why this exists (c3 heritage, email-loop insight) | `docs/tutorial.md` §1 |
+| The two halves (Python loop vs agent reasoning) | `docs/tutorial.md` §2 |
+| The yoker SDK seam | `docs/tutorial.md` §3, `docs/architecture.md` |
+| The simple-email-gw seam | `docs/tutorial.md` §3, `docs/architecture.md` |
+| The handoff contract | `docs/tutorial.md` §4, `docs/architecture.md` |
+| The bounded tool set and the safety model | `docs/tutorial.md` §5 |
+| Configuration | `README.md` (condensed) + `docs/configuration.md` (full) |
+| Running it | `README.md` "Running it" + `docs/quickstart.md` |
+| The c3 → yoker-assistant porting map | `docs/tutorial.md` §6 (narrative) + `docs/porting-map.md` (full table) |
+| Persistent-session architecture | `docs/tutorial.md` §7, `docs/architecture.md` |
+| Custom md→html tool story | `docs/tutorial.md` §8, `docs/architecture.md` |
+| Dual-mode architecture | `docs/tutorial.md` §9, `docs/architecture.md` |
+| Git commit/push demo beat | `docs/tutorial.md` §10 |
+| Recipient safety | `docs/tutorial.md` §11, `docs/security.md` |
+| Security configuration (a) blast radius + version pinning | `README.md` "Security configuration" + `docs/security.md` |
+| Security configuration (b) `EMAIL_RECIPIENT_WHITELIST_ADDRESSES` | `README.md` + `docs/security.md` + `docs/tutorial.md` §11 |
+| Security configuration (c) `~/.yoker.toml`/`.env` never committed | `README.md` (new bullet) + `docs/security.md` |
+| Use `c3:readme` for structure and badges | Applied to README at implementation time |
+| New reader can set it up and run `python -m yoker_assistant --once` | `README.md` "Quick start" + `docs/quickstart.md` |
+| Porting map explicit about kept/removed/reworked | `docs/porting-map.md` (full per-element) |
+| Persistent-session, custom-tool, git-demo each explained as build decisions | `docs/tutorial.md` §7, §8, §10 |
+| Tutorial is all-inclusive narrative, not reduced links | `docs/tutorial.md` — full prose throughout |
+| README references docs pages (works on PyPI) | `README.md` "Documentation" section, absolute ReadTheDocs URLs |
 
-## Length estimate
+## Standards improvement note
 
-- Existing README to keep: ~60 lines (Quick start, Configuration,
-  Security configuration, License) — folded into the new order.
-- New narrative sections: ~350–450 lines.
-- Code snippets + tables + the ASCII diagram: ~80–100 lines.
-- **Total target: 450–600 lines.** Hard cap at 700 — if it grows past
-  that, the section is duplicating `functional.md` and should be
-  trimmed with a cross-reference.
+The owner asked: "If this wasn't clear from our standard project setup
+procedures, we need to improve this."
 
-## Implementation notes (for the implementer, not part of the README)
+**Finding:** The standard IS clear and documented in two places:
+- `c3:documentation` skill (`/Users/xtof/Workspace/agentic/c3/skills/documentation/SKILL.md`)
+- `end-user-documenter` agent (`/Users/xtof/Workspace/agentic/c3/agents/end-user-documenter.md`)
 
-1. **Use `c3:readme` skill** when writing the actual README — it
-   provides the structure template and badge conventions. The plan
-   above is the content outline; the skill supplies the scaffolding
-   (badges, section ordering conventions, link style).
-2. **Two-space indentation** per the global instruction (the existing
-   README already uses this for the `~/.yoker.toml` block).
-3. **No emojis** per the global instruction. The existing README has
-   none; keep it that way.
-4. **ASCII diagram only** — no images, no mermaid. Avoids the relative
-   image path pre-publish guard in `Makefile` and keeps the README
-   portable on PyPI.
-5. **Preserve existing anchors** — the Security configuration
-   subsection and the Configuration subsection are already linked from
-   elsewhere (functional.md, SECURITY.md). Keep their headings.
-6. **Do NOT touch** `analysis/functional.md` or `SECURITY.md` in this
-   task — the README cross-references them as-is.
-7. **Status line update** — change "Skeleton (P1-001)" to "First pass
-   implemented (P1–P3). See `TODO.md` for the remaining backlog." This
-   is the only edit to the existing Status section.
-8. **Recipients of review:** the README is reviewed under
-   `c3:project-review` (functional → domain → quality → documentation
-   → completeness) before the PR is pushed, per the standard project
-   workflow.
+Both explicitly define the `docs/` + Sphinx + ReadTheDocs approach and the
+README-as-front-door role. The original P4-001 plan did not consult either
+of these — it treated the README as the sole documentation surface, which is
+NOT what the standard says. This is a procedural miss, not a standards gap.
+
+**Follow-up (separate from this PR, flagged for the c3 skills):**
+- Consider adding a one-line pointer in `c3:readme` (the skill the original
+  plan cited) that says "README is the front-door; full documentation lives
+  in `docs/` — see `c3:documentation`." This would prevent the same miss
+  when the next agent only consults `c3:readme`. The `c3:readme` skill
+  already says "concise introduction with just enough examples" but does
+  not currently cross-reference `c3:documentation`.
+- This is a c3-skills improvement, NOT a blocker for P4-001. File it as a
+  separate TODO (e.g., under `c3/skills/readme/` as an issue or a
+  `lessons-learned` entry).
+
+## Estimated length
+
+- **README.md**: 120–180 lines (lean front-door — quick start, condensed
+  config, security configuration, running it, one docs link, license).
+- **docs/tutorial.md**: 600–800 lines (full all-inclusive narrative).
+- **docs/architecture.md**: 400–600 lines (full seam-by-seam reference).
+- **docs/porting-map.md**: 150–250 lines (full per-element table).
+- **docs/security.md**: 150–250 lines.
+- **docs/configuration.md**: 100–200 lines.
+- **docs/installation.md**: 80–150 lines.
+- **docs/quickstart.md**: 80–150 lines.
+- **docs/api.md**: 100–200 lines (autodoc-assisted).
+- **docs/changelog.md**: 40–80 lines (seeded, grows over time).
+- **docs/index.md**: 30–50 lines.
+- **`docs/conf.py`**: ~25 lines.
+- **`.readthedocs.yaml`**: ~15 lines.
+
+**Total docs/ target: ~1,900–2,800 lines across all pages.** This is
+larger than the original 450–600-line single-README plan, which is the
+point — the owner explicitly asked for all-inclusive, not reduced.
 
 ## Out of scope for this plan
 
-- Writing the README itself (this plan is the deliverable for this
-  step; implementation is a separate step).
-- Editing `analysis/functional.md` (already up to date per P1-003
-  errata).
-- Editing `SECURITY.md` (already complete per S-01).
+- Writing the docs themselves (this plan is the deliverable for this step;
+  implementation is a separate step).
+- Editing `analysis/functional.md` (already up to date per P1-003 errata).
+- Editing `SECURITY.md` (already complete per S-01). The `docs/security.md`
+  page links to `SECURITY.md` (or transcludes its content); the source
+  `SECURITY.md` is not modified.
 - Any code changes (P4-001 is docs-only).
-- The `make run-demo` target (TODO.md "Unsorted" — nice to have, not
-  P4-001).
+- The `make run-demo` target (TODO.md "Unsorted" — not P4-001).
+- Enabling ReadTheDocs on readthedocs.org (owner action after PR merge; the
+  `.readthedocs.yaml` in the repo is what enables the build once connected).
+- The c3-skills improvement (filed as a separate follow-up, see Standards
+  Improvement Note).
