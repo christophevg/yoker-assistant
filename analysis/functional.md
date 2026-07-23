@@ -105,8 +105,10 @@ surface, confirmed against `yoker/examples/library_usage.py` and
 ```python
 from yoker import Agent
 
-# Constructed ONCE at startup with a persistent context manager.
-agent = Agent(agent_path="agents/assistant.md",
+# Constructed ONCE at startup with a persistent context manager. The agent
+# definition is loaded from the installed package's agents/ directory via
+# importlib.resources (no relative filesystem path) — see §2.3.1.
+agent = Agent(agent_definition=_load_assistant_definition(),
               context_manager=Persisted(SimpleContextManager(),
                                          session_id="yoker-assistant"))
 # Each email is the next user message in the SAME session.
@@ -134,7 +136,7 @@ Key facts of the seam:
 - Skills are loaded from configured `skills/` directories and invoked via the
   `yoker:skill` tool or `agent.inject_skill_context(name, args)`.
 - The whole project hinges on this seam. It is usable today (yoker 0.8.0,
-  released 2026-07-15): `Agent` + `agent_path` + `process` is sufficient.
+  released 2026-07-15): `Agent` + `agent_definition` + `process` is sufficient.
   No blocker. The plugin API (`PluginManifest`, `__YOKER_MANIFEST__`,
   `load_plugins`) is functional with one published third-party consumer
   (`pkgq`); still 0.x so breaking changes are possible, but the contract
@@ -150,11 +152,16 @@ dual-mode. The clean code shape:
 - Define the `md_to_html` tool in `src/yoker_assistant/tools.py` as a
   plain Python function with yoker tool annotations
   (`Annotated[str, Text(...)]`).
-- Expose `__YOKER_MANIFEST__ = PluginManifest(tools=[md_to_html])` in
-  `src/yoker_assistant/__init__.py`. The `__init__.py` must ONLY define
-  the manifest and import tool functions — NO `Agent` construction or
-  loop logic there (that lives in `__main__`/`loop`/`agent` modules).
-  This discipline avoids any circular import.
+- Expose `__YOKER_MANIFEST__ = PluginManifest(tools=[md_to_html],
+  agents_dir="agents")` in `src/yoker_assistant/__init__.py`. The
+  `agents_dir` field tells the yoker plugin loader to discover
+  `agents/*.md` inside the installed `yoker_assistant` package — so
+  external yoker consumers can reference the assistant agent by name
+  (`yoker_assistant:assistant`) from their `Session`'s registry. The
+  `__init__.py` must ONLY define the manifest and import tool functions
+  — NO `Agent` construction or loop logic there (that lives in
+  `__main__`/`loop`/`agent` modules). This discipline avoids any
+  circular import.
 - The user adds the plugin registration to their `~/.yoker.toml`:
   `[plugins] enabled = true; packages = ["yoker_assistant", "pkgq"]`
   and `[plugins.trusted] yoker_assistant = true; pkgq = true`.
@@ -171,9 +178,11 @@ dual-mode. The clean code shape:
   local dev (when the cwd is the checkout) and there it clobbers the
   user's backend/model config. The user's `~/.yoker.toml` is the
   correct location for plugin registration.
-- The `Agent` is constructed normally
-  (`Agent(agent_path="agents/assistant.md")`); plugins load from
-  `~/.yoker.toml` automatically. No `plugins=()` arg is needed.
+- The `Agent` is constructed with `agent_definition=_load_assistant_definition()`
+  (the definition is loaded from the installed package's `agents/` directory
+  via `find_package_subdirectory` + `load_agent_definitions` — no relative
+  filesystem path that would break when the package is installed). Plugins
+  load from `~/.yoker.toml` automatically. No `plugins=()` arg is needed.
 - External consumers load yoker-assistant's tools the IDENTICAL way:
   `pip install yoker-assistant` plus the same `[plugins]` /
   `[plugins.trusted]` lines in their `~/.yoker.toml`. Self-consumption
@@ -207,19 +216,26 @@ smtp = await pool.get_smtp_client("default")
 
 # simple_email_gw 0.3.0 IMAPClient/SMTPClient do NOT implement
 # __aenter__/__aexit__; they expose explicit connect()/disconnect() methods.
-# The loop (P2-005) calls them directly: `await connect()` once at startup,
-# `await disconnect()` on shutdown. No wrapper class, no indirection layer —
-# the loop owns the gateway lifecycle explicitly. The pool returns cached
-# but NOT-yet-connected clients, so the explicit connect() is still required.
-await imap.connect()
-try:
-    ids = await imap.search(folder="INBOX", criteria="UNSEEN")
-    msg = await imap.fetch_message(message_id=ids[0], folder="INBOX")
-    # msg -> dict with id, folder, subject, from, to, body, attachments
-    await imap.mark_message(message_id, "INBOX", "\\Seen", "add")
-    await imap.move_message(message_id, "INBOX", "Archive")
-finally:
-    await imap.disconnect()
+# The loop (P2-005) calls them directly: `await connect()` + `await
+# disconnect()` bookend EACH iteration. The poll interval is several
+# minutes, so holding an idle connection open across the sleep would just
+# time out server-side every time — reconnecting per iteration is simpler
+# and avoids the reconnect-on-failure guard entirely. The first
+# iteration's connect is the credential check (no startup fast-fail
+# connect outside the loop). No wrapper class, no indirection layer —
+# the loop owns the gateway lifecycle explicitly. The pool returns
+# cached but NOT-yet-connected clients, so the explicit connect() is
+# still required.
+while not stop.is_set():
+    await imap.connect()
+    try:
+        ids = await imap.search(folder="INBOX", criteria="UNSEEN")
+        msg = await imap.fetch_message(message_id=ids[0], folder="INBOX")
+        # msg -> dict with id, folder, subject, from, to, body, attachments
+        await imap.mark_message(message_id, "INBOX", "\\Seen", "add")
+        await imap.move_message(message_id, "INBOX", "Archive")
+    finally:
+        await imap.disconnect()
 
 # SMTPClient is fire-and-forget per send (no connect()/disconnect()).
 await smtp.reply_email(to=[sender], subject=f"Re: {subject}",
@@ -230,13 +246,21 @@ await smtp.reply_email(to=[sender], subject=f"Re: {subject}",
 showed `async with IMAPClient(account) as imap:`. That is inaccurate —
 simple_email_gw 0.3.0 `IMAPClient`/`SMTPClient` are NOT async context
 managers; they expose explicit `connect()`/`disconnect()` methods. The loop
-calls those methods directly (construct once via the pool, `await
-imap.connect()` once, `await imap.disconnect()` on shutdown). There is NO
-`Mailbox` wrapper class and no seam object with `__aenter__`/`__aexit__` or
-`connect()`/`close()` methods — an earlier design proposed one, but it was
-descoped per owner feedback (wrapping two existing classes in a third class
-added no benefit for a demo/tutorial). The method signatures and behaviour
-described below remain correct.
+calls those methods directly (construct once via the pool, then per
+iteration `await imap.connect()` ... `await imap.disconnect()` in a
+`finally`). There is NO `Mailbox` wrapper class and no seam object with
+`__aenter__`/`__aexit__` or `connect()`/`close()` methods — an earlier
+design proposed one, but it was descoped per owner feedback (wrapping two
+existing classes in a third class added no benefit for a demo/tutorial).
+The method signatures and behaviour described below remain correct.
+
+**Connection lifetime (PR #7 round-2 owner feedback):** the loop does NOT
+hold the IMAP connection open across the multi-minute poll interval. Each
+iteration bookends with `connect()` / `disconnect()`. A dropped
+connection mid-iteration surfaces as a per-message exception (logged,
+message left UNSEEN, retried next iteration with a fresh connection); no
+reconnect-on-failure guard is needed. This simplifies the loop and matches
+the owner's observation that an idle connection would time out every time.
 
 `EmailAccount` fields: `name`, `imap_host`, `smtp_host`, `username`,
 `password`. Configuration is read by the SDK's `ServerConfig` from env vars
@@ -258,7 +282,21 @@ the yoker context. c3 runs inside Claude Code with its own orchestrator;
 yoker is an SDK/runtime with different mechanics. For each adapted piece,
 what is kept verbatim and what is reworked is stated explicitly.
 
-### 3.1 The agent definition (`../c3/agents/assistant.md`)
+### 3.1 The agent definition (`src/yoker_assistant/agents/assistant.md`)
+
+The agent definition is **packaged inside the yoker_assistant package**
+(`src/yoker_assistant/agents/assistant.md`) and loaded at runtime via
+`find_package_subdirectory("yoker_assistant", "agents")` +
+`load_agent_definitions` — the same primitives yoker's plugin loader uses.
+This fixes the relative-path fragility the owner flagged in PR #7 round 2
+("a file path won't work when the assistant is run from a package"). The
+manifest's `agents_dir="agents"` field lets external yoker consumers
+reference the agent as `yoker_assistant:assistant` via their `Session`'s
+registry. Name-based resolution from the bare `Agent` the loop uses is
+NOT supported by the yoker SDK today (the bare `Agent` has no agent
+registry — only `Session` does); an upstream yoker issue has been filed
+for that feature. Until then, the loop passes the loaded `AgentDefinition`
+explicitly as `agent_definition=`.
 
 | Element | c3 original | yoker-assistant | Verdict |
 |---|---|---|---|
@@ -438,7 +476,8 @@ Python hands to the agent and what the agent returns.
 
 The package runs **one long-lived agentic session**. The agent's identity,
 workflow, categorization rules, and guardrails live in the agent definition
-(`agents/assistant.md`, loaded by yoker as the system prompt) — NOT in the
+(`src/yoker_assistant/agents/assistant.md`, packaged inside this package and
+loaded by yoker as the system prompt) — NOT in the
 per-email payload. At **startup** (one-time session-setup step), the package
 constructs the `Agent` once with a persistent context manager and sends a
 ONE-TIME initialize message to the session before the loop begins (an
@@ -478,6 +517,17 @@ returns that HTML string. That string **is** the reply body. Python does not
 interpret it or re-render it; it sends the HTML verbatim as the email body
 (subject `Re: <original subject>`, to the sender). Markdown and email do not
 render well together, so the reply is HTML end-to-end.
+
+### 4.2.1 Conversation-style logging
+
+Per owner feedback (PR #7 round 2), `_process_one` emits two `logger.info`
+calls framing the conversation between user and agent — one before
+`agent.process` (the incoming handoff, "user turn") and one after (the
+agent's reply, "agent turn"), with `===` separators so the two turns are
+visible in normal INFO-level log output. An empty reply is logged
+explicitly as `"(empty — no reply)"` so a silent agent turn still shows up
+in the conversation log. The one-time `Initialize` setup turn is NOT
+logged — it is a session-setup handshake, not an incoming message.
 
 ### 4.3 How Python turns that into a reply
 
@@ -586,7 +636,9 @@ user must add to their `~/.yoker.toml`, not a checked-in active config.
 
 ### 5.3 Assistant / personalization
 
-- `agent_path` (path to the ported `agents/assistant.md`).
+- `agent_definition` (the ported assistant agent definition, loaded from
+  the package's `agents/assistant.md` via `find_package_subdirectory` +
+  `load_agent_definitions`).
 - `PERSONAL.md` path (owner identity, tone, goals). The agent reads it at
   session startup via `yoker:read` and may write to it (learned behaviours)
   via `yoker:update`/`yoker:write`; the agent also commits and pushes it via
@@ -609,7 +661,7 @@ yoker-assistant
 ```
 
 It runs `asyncio.run(main())`, which constructs the `EmailAccount`, the
-`Agent(agent_path=..., context_manager=<persistent>)` **once**, runs the
+`Agent(agent_definition=..., context_manager=<persistent>)` **once**, runs the
 one-time session-setup step (agent reads `PERSONAL.md` and initializes), and
 enters the loop. A `--once` flag processes a single iteration and exits
 (useful for tests and demos). Graceful shutdown on `SIGINT`/`SIGTERM`: finish
