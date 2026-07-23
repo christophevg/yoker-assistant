@@ -212,7 +212,7 @@ async def test_run_refuses_to_start_when_whitelist_disabled(
   whitelist = MagicMock()
   whitelist.enabled = False
   monkeypatch.setattr("yoker_assistant.loop.get_recipient_whitelist", lambda: whitelist)
-  with pytest.raises(RuntimeError, match="recipient whitelist"):
+  with pytest.raises(RuntimeError, match="EMAIL_RECIPIENT_ADDRESSES"):
     await run(once=True)
 
 
@@ -224,31 +224,43 @@ def _enable_whitelist(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
   return whitelist
 
 
-def _set_env(monkeypatch: pytest.MonkeyPatch) -> None:
-  """Set the EMAIL_* env vars _account_from_env reads."""
-  for key, value in {
-    "EMAIL_NAME": "test",
-    "EMAIL_IMAP_HOST": "imap.example.com",
-    "EMAIL_SMTP_HOST": "smtp.example.com",
-    "EMAIL_USERNAME": "user",
-    "EMAIL_PASSWORD": "pass",
-  }.items():
-    monkeypatch.setenv(key, value)
+def _mock_pool(
+  monkeypatch: pytest.MonkeyPatch,
+  imap: MagicMock,
+  smtp: MagicMock,
+) -> None:
+  """Patch get_pool to return a pool yielding the given imap/smtp mocks."""
+  pool = MagicMock()
+  pool.get_imap_client = AsyncMock(return_value=imap)
+  pool.get_smtp_client = AsyncMock(return_value=smtp)
+  monkeypatch.setattr("yoker_assistant.loop.get_pool", AsyncMock(return_value=pool))
+
+
+def _make_imap(search_result: list[str] | None = None) -> MagicMock:
+  """Build a mocked IMAPClient with the methods the loop touches."""
+  imap = MagicMock()
+  imap.connect = AsyncMock()
+  imap.disconnect = AsyncMock()
+  imap.search = AsyncMock(return_value=search_result if search_result is not None else [])
+  imap.fetch_message = AsyncMock(return_value=_make_msg())
+  imap.mark_message = AsyncMock(return_value=True)
+  imap.move_message = AsyncMock(return_value=True)
+  return imap
+
+
+def _make_smtp() -> MagicMock:
+  smtp = MagicMock()
+  smtp.reply_email = AsyncMock(return_value={"status": "sent"})
+  return smtp
 
 
 async def test_run_proceeds_when_whitelist_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
   """C1 happy path: run() does not raise when whitelist is enabled."""
   _enable_whitelist(monkeypatch)
-  _set_env(monkeypatch)
 
-  imap = MagicMock()
-  imap.connect = AsyncMock()
-  imap.search = AsyncMock(return_value=[])
-  imap.disconnect = AsyncMock()
-  monkeypatch.setattr("yoker_assistant.loop.IMAPClient", lambda account: imap)
-
-  smtp = MagicMock()
-  monkeypatch.setattr("yoker_assistant.loop.SMTPClient", lambda account: smtp)
+  imap = _make_imap()
+  smtp = _make_smtp()
+  _mock_pool(monkeypatch, imap, smtp)
 
   agent = MagicMock()
   agent.process = AsyncMock(return_value=NO_REPLY_SENTINEL)
@@ -267,18 +279,10 @@ async def test_run_continues_after_process_one_exception(
 ) -> None:
   """§7 robustness: if _process_one raises, the loop continues to the next message."""
   _enable_whitelist(monkeypatch)
-  _set_env(monkeypatch)
 
-  imap = MagicMock()
-  imap.connect = AsyncMock()
-  imap.search = AsyncMock(return_value=["msg1", "msg2"])
-  imap.fetch_message = AsyncMock(return_value=_make_msg())
-  imap.disconnect = AsyncMock()
-  monkeypatch.setattr("yoker_assistant.loop.IMAPClient", lambda account: imap)
-
-  smtp = MagicMock()
-  smtp.reply_email = AsyncMock(return_value={"status": "sent"})
-  monkeypatch.setattr("yoker_assistant.loop.SMTPClient", lambda account: smtp)
+  imap = _make_imap(search_result=["msg1", "msg2"])
+  smtp = _make_smtp()
+  _mock_pool(monkeypatch, imap, smtp)
 
   agent = MagicMock()
   # First process call is the Initialize setup turn; then per-message calls:
@@ -293,3 +297,26 @@ async def test_run_continues_after_process_one_exception(
   assert agent.process.await_count == 3  # Initialize + 2 messages
   assert imap.fetch_message.await_count == 2
   imap.disconnect.assert_awaited_once()
+
+
+async def test_run_reconnects_after_search_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+  """Dropped idle connection: search fails → disconnect → reconnect → search succeeds."""
+  _enable_whitelist(monkeypatch)
+
+  imap = _make_imap()
+  # First search raises, second (after reconnect) succeeds with empty result.
+  imap.search = AsyncMock(side_effect=[ConnectionError("dropped"), []])
+  smtp = _make_smtp()
+  _mock_pool(monkeypatch, imap, smtp)
+
+  agent = MagicMock()
+  agent.process = AsyncMock(return_value=NO_REPLY_SENTINEL)
+  monkeypatch.setattr("yoker_assistant.loop.Agent", lambda **kwargs: agent)
+
+  await run(once=True)
+
+  # Reconnect path: disconnect (tolerating failure) + connect + retry search.
+  assert imap.search.await_count == 2
+  imap.disconnect.assert_awaited()
+  # connect() is called once at startup, once on reconnect.
+  assert imap.connect.await_count == 2
