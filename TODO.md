@@ -393,7 +393,7 @@ new bounded tools remain Phase B and are deliberately absent.
 
 ### P3 — Tests
 
-- [ ] **P3-001: Tests for the handoff contract**
+- [x] **P3-001: Tests for the handoff contract** ✅ (2026-07-23, PR #8)
   - `tests/test_handoff.py`: assert `build_message` produces the documented
     format for a representative message (From/Subject/Date headers + body
     present; NO `Instructions:` block).
@@ -401,7 +401,7 @@ new bounded tools remain Phase B and are deliberately absent.
     regress if the format changed.
   - **Satisfies:** tests (handoff)
 
-- [ ] **P3-002: Tests for the polling logic**
+- [x] **P3-002: Tests for the polling logic** ✅ (2026-07-23, PR #8)
   - `tests/test_loop.py`: with fake `IMAPClient`/`SMTPClient` stubs (no
     network) and a fake `Agent` (no backend — a stub that returns a canned
     reply string from `process()`), assert the loop:
@@ -433,8 +433,8 @@ new bounded tools remain Phase B and are deliberately absent.
 
 ### P3 — Security (defense in depth)
 
-- [ ] **S-01: Add `SECURITY.md` describing the `__YOKER_MANIFEST__` review
-  process**
+- [x] **S-01: Add `SECURITY.md` describing the `__YOKER_MANIFEST__` review
+  process** ✅ (2026-07-23, PR #8)
   - Every addition to `__YOKER_MANIFEST__` auto-trusts on user install via
     `[plugins.trusted] yoker_assistant = true` — there is no secondary
     review gate inside the package. `SECURITY.md` documents the review
@@ -447,8 +447,8 @@ new bounded tools remain Phase B and are deliberately absent.
     Security configuration subsection.
   - **Satisfies:** security (manifest review process)
 
-- [ ] **S-02: `make pre-publish` guard rejecting non-registry source URLs in
-  built metadata**
+- [x] **S-02: `make pre-publish` guard rejecting non-registry source URLs in
+  built metadata** ✅ (2026-07-23, PR #8)
   - Defense in depth: a publish-time guard that fails `make pre-publish` if
     the built sdist/wheel METADATA contains `file://`, `path =`, or any
     non-registry source URL. Prevents the P1-002 path-dep leakage class from
