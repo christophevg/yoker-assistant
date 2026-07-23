@@ -289,7 +289,7 @@ new bounded tools remain Phase B and are deliberately absent.
 
 ### P2 — The loop
 
-- [ ] **P2-005: Implement the main loop**
+- [x] **P2-005: Implement the main loop** ✅ (2026-07-23, PR #7 — combined implementation per owner directive)
   - Create `yoker_assistant/__main__.py` (and `loop.py` if separated):
     - `async def run()`: build `EmailAccount`, construct the `Agent`
       **ONCE** directly (per P1-004 — no `Assistant` wrapper):
@@ -350,7 +350,7 @@ new bounded tools remain Phase B and are deliberately absent.
 
 ### P2 — The handoff contract
 
-- [ ] **P2-006: Implement the handoff payload builder**
+- [x] **P2-006: Implement the handoff payload builder** ✅ (2026-07-23, PR #7 — combined implementation per owner directive)
   - Create `yoker_assistant/handoff.py`: `build_message(email_message) -> str`
     producing the §4.1 format — **only** `From`/`Subject`/`Date` headers + body.
     NO instructions block. Identity/instructions live in the agent definition
