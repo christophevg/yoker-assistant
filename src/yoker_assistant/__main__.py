@@ -1,21 +1,28 @@
 """Entry point for ``python -m yoker_assistant``.
 
-P1-001 stub: exits cleanly when no configuration is present. The real loop
-lands in P2-005.
+Thin CLI wrapper around :func:`yoker_assistant.loop.run`.
 """
 
+import argparse
+import asyncio
 import sys
+
+from yoker_assistant.loop import run
 
 
 def main() -> None:
-  """Run the assistant.
+  """Run the assistant email loop.
 
-  For now this is a stub: the email gateway (IMAP/SMTP via
-  ``simple_email_gw``) is not yet wired in, so it prints a notice and
-  exits cleanly.
+  Pass ``--once`` to process a single poll iteration and exit (useful for
+  tests and demos).
   """
-  print("yoker-assistant: not configured yet (see P2-005).")
-  sys.exit(0)
+  parser = argparse.ArgumentParser(prog="yoker-assistant", description="yoker-assistant email loop")
+  parser.add_argument("--once", action="store_true", help="process one poll iteration and exit")
+  args = parser.parse_args()
+  try:
+    asyncio.run(run(once=args.once))
+  except KeyboardInterrupt:
+    sys.exit(0)
 
 
 if __name__ == "__main__":

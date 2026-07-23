@@ -483,23 +483,30 @@ render well together, so the reply is HTML end-to-end.
 
 1. Capture `reply_html = await agent.process(message)` (the agent has
    already converted markdown → HTML via its tool).
-2. If `reply_html` is non-empty, send it via
-   `SMTPClient.reply_email(to=sender, subject=f"Re: {subject}",
-   html_body=reply_html, in_reply_to=message_id)` (threading preserved).
-   Every send is a reply — always `reply_email`; there is NO `send_email`
-   fallback. The `Re:` subject and `in_reply_to=msg["message_id"]` are
-   loop-side one-liners. The reply is sent ONLY if the agent produced a
-   non-empty reply body; if the agent returns no content, the loop skips
-   the send (and the message-handling decision in that case is a loop
-   concern, not a seam concern).
-   **Clarification (P1-003 cross-domain review):** `reply_email` sets the
-   HTML content type when `html_body` is passed; the loop forwards the
-   agent's HTML as `html_body=` (not `body=`) and does NOT construct MIME
-   itself. The HTML content-type routing lives in `simple_email_gw`, not in
-   this package. The plain-text alternative (`text_body=`) is intentionally
-   empty in the first pass; accessibility polish is deferred.
-3. Mark the original message `\Seen`.
-4. Move the original to the archive folder.
+2. Four-way branch on `reply_html`:
+   - **`{{NO_REPLY}}` sentinel present** (intentional silence): mark the
+     original `\Seen` and archive it. No reply is sent.
+   - **empty/whitespace reply** (transient problem): leave the message
+     `UNSEEN` so it is retried next iteration. No mark, no archive, no send.
+   - **unsafe HTML** (guard failure — `<script>`/`<style>`/`<img>`/
+     `<iframe>`/`<object>`/`<embed>`/`<form>` or `on*=` event handlers):
+     mark the original `\Seen` (do NOT archive — the owner controls
+     reprocessing by removing `\Seen`), and send a plain-text notice to the
+     original sender via `reply_email(to=sender, body=notice, ...)`.
+   - **valid HTML reply**: send via
+     `SMTPClient.reply_email(to=sender, subject=f"Re: {subject}", body="",
+     html_body=reply_html, in_reply_to=message_id)` (threading preserved),
+     then mark `\Seen` and archive.
+3. Every send is a reply — always `reply_email`; there is NO `send_email`
+   fallback. `to` is a bare address string extracted via
+   `parseaddr(msg["from"])[1]` (the gateway's `validate_email` rejects
+   display-name headers). `body=""` is required by `reply_email`'s
+   signature; the plain-text alternative is intentionally empty in the
+   first pass (accessibility polish deferred).
+4. **Ordering (send → mark read → archive)** for the valid-reply branch:
+   send the reply before marking read so a send failure leaves the message
+   `UNSEEN` for retry. Mark read immediately after a successful send, then
+   archive.
 
 **Demo beat (the visible "acts on behalf of the owner" moment):** the agent
 learns a behaviour from an email → writes it to `PERSONAL.md` (via
@@ -607,8 +614,19 @@ the current message, close IMAP/SMTP connections, exit.
     mark read, continue to next message or next iteration. The message
     retries on the next `UNSEEN` search.
   - Reply send failure: do not mark read; retry next iteration.
+  - Guard failure (unsafe HTML in agent output): mark `\Seen` (no archive)
+    and send a plain-text notice to the original sender. The owner controls
+    reprocessing by removing `\Seen`.
+  - Empty/whitespace reply (transient): leave `UNSEEN`, no mark/archive,
+    retry next iteration. The `{{NO_REPLY}}` sentinel is the agent's
+    intentional-silence signal and is handled separately (mark + archive).
   - Unexpected exception per message: log, skip the message (leave it
     `UNSEEN` so it is retried), continue the loop.
+  - **C1 startup guard:** the loop refuses to start when
+    `EMAIL_RECIPIENT_WHITELIST_ADDRESSES` is unset — the recipient whitelist
+    fails open, so an unset whitelist would let the assistant reply to
+    arbitrary senders. `run()` raises `RuntimeError` before constructing
+    the `Agent`.
 - **Graceful shutdown:** on signal, stop accepting new messages, finish the
   in-flight message, close connections, exit 0.
 - **No background concurrency in the first pass:** one loop, one message at a

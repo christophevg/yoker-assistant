@@ -152,6 +152,9 @@ Each incoming user message is the next turn in the ongoing session.
 ### Phase 4: Reply
 
 ```
+0. No-reply sentinel: if you choose NOT to reply to this message, output
+   exactly `{{NO_REPLY}}` and nothing else. This signals the loop that your
+   silence is intentional. Do not use this sentinel for any other purpose.
 1. Compose the reply in markdown following the Output Format templates
    (Actions Taken, Questions Remaining, Memory Created, Status).
 2. The reply reports the outcome of the Phase 3: Update — success or
