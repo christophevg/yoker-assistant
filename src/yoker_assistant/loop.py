@@ -16,13 +16,12 @@ a From/Subject/Date/body payload, and branches on the agent's reply:
 
 import asyncio
 import logging
-import os
 import re
 from email.utils import parseaddr
 from signal import SIGINT, SIGTERM
 from typing import Any
 
-from simple_email_gw import EmailAccount, IMAPClient, SMTPClient
+from simple_email_gw import IMAPClient, SMTPClient, get_pool
 from simple_email_gw.config import get_recipient_whitelist
 from yoker import Agent, Persisted, SimpleContextManager
 
@@ -33,6 +32,9 @@ _INITIALIZE_PROMPT = "Initialize"
 _POLL_INTERVAL = 60  # seconds between polls when inbox is empty
 _INBOX_FOLDER = "INBOX"
 _ARCHIVE_FOLDER = "Archive"
+# The pool resolves account configuration from the SDK's ServerConfig; the
+# loop only knows the account name (the SDK's default convention).
+_ACCOUNT_NAME = "default"
 
 _UNSAFE_TAGS = ("<script", "<style", "<img", "<iframe", "<object", "<embed", "<form")
 _UNSAFE_HANDLER = re.compile(r"\son\w+\s*=")
@@ -113,34 +115,22 @@ async def _process_one(
     await imap.move_message(message_id, _INBOX_FOLDER, _ARCHIVE_FOLDER)
 
 
-def _account_from_env() -> EmailAccount:
-  """Construct an ``EmailAccount`` from the EMAIL_* environment variables."""
-  return EmailAccount(
-    name=os.environ.get("EMAIL_NAME", "default"),
-    imap_host=os.environ["EMAIL_IMAP_HOST"],
-    imap_port=int(os.environ.get("EMAIL_IMAP_PORT", "993")),
-    smtp_host=os.environ["EMAIL_SMTP_HOST"],
-    smtp_port=int(os.environ.get("EMAIL_SMTP_PORT", "587")),
-    username=os.environ["EMAIL_USERNAME"],
-    password=os.environ["EMAIL_PASSWORD"],
-  )
-
-
 async def run(once: bool = False) -> None:
   """The main loop. Constructs the Agent once, polls IMAP, processes messages.
 
   Refuses to start when the recipient whitelist is disabled (C1 blocking fix):
-  the whitelist fails open, so an unset ``EMAIL_RECIPIENT_WHITELIST_ADDRESSES``
-  would let the assistant reply to arbitrary senders.
+  the whitelist fails open, so an unset whitelist would let the assistant reply
+  to arbitrary senders. Account/credentials configuration is delegated to
+  Simple Email GW's ``ConnectionPool`` via the ``"default"`` account name.
   """
   # C1 BLOCKING FIX: refuse to run if the recipient whitelist is disabled.
   if not get_recipient_whitelist().enabled:
     raise RuntimeError(
-      "EMAIL_RECIPIENT_WHITELIST_ADDRESSES not set — refusing to run "
-      "(recipient whitelist fails open)"
+      "Recipient whitelist is disabled — refusing to run (fails open). "
+      "Set EMAIL_RECIPIENT_DOMAINS, EMAIL_RECIPIENT_ADDRESSES, "
+      "or EMAIL_RECIPIENT_WHITELIST_JSON to enable outgoing reply safety."
     )
 
-  account = _account_from_env()
   agent = Agent(
     agent_path="agents/assistant.md",
     context_manager=Persisted(SimpleContextManager(), session_id="yoker-assistant"),
@@ -149,8 +139,11 @@ async def run(once: bool = False) -> None:
   # One-time session-setup turn (§4.1).
   await agent.process(_INITIALIZE_PROMPT)
 
-  imap = IMAPClient(account)
-  smtp = SMTPClient(account)  # no connect()/disconnect() — fire-and-forget per send
+  # The pool reads the EMAIL_* env vars via ServerConfig and caches clients.
+  # Returned clients are NOT yet connected — call connect() explicitly.
+  pool = await get_pool()
+  imap = await pool.get_imap_client(_ACCOUNT_NAME)
+  smtp = await pool.get_smtp_client(_ACCOUNT_NAME)  # fire-and-forget per send
 
   stop = asyncio.Event()
   loop = asyncio.get_running_loop()
@@ -164,7 +157,18 @@ async def run(once: bool = False) -> None:
   await imap.connect()  # fast-fail on bad credentials
   try:
     while not stop.is_set():
-      uids = await imap.search(_INBOX_FOLDER, "UNSEEN")
+      # Reconnect-on-failure: a dropped idle connection (after the 60s sleep)
+      # surfaces here. Disconnect + reconnect + retry once before giving up.
+      try:
+        uids = await imap.search(_INBOX_FOLDER, "UNSEEN")
+      except Exception as e:
+        logger.warning(f"IMAP search failed, reconnecting: {e}")
+        try:
+          await imap.disconnect()
+        except Exception:
+          pass
+        await imap.connect()
+        uids = await imap.search(_INBOX_FOLDER, "UNSEEN")
       for mid in uids:
         if stop.is_set():
           break

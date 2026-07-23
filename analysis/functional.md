@@ -197,17 +197,20 @@ synchronous code. The async API (confirmed from `simple_email_gw/__init__.py`
 and the client sources):
 
 ```python
-from simple_email_gw import EmailAccount, IMAPClient, SMTPClient
+from simple_email_gw import get_pool
 
-account = EmailAccount(name="default", imap_host=..., smtp_host=...,
-                        username=..., password=...)
+# The pool reads EMAIL_* env vars via ServerConfig and caches clients.
+# The loop only knows the account name ("default" — the SDK convention).
+pool = await get_pool()
+imap = await pool.get_imap_client("default")
+smtp = await pool.get_smtp_client("default")
 
 # simple_email_gw 0.3.0 IMAPClient/SMTPClient do NOT implement
 # __aenter__/__aexit__; they expose explicit connect()/disconnect() methods.
-# The loop (P2-005) calls them directly: construct once, `await connect()`
-# once, `await disconnect()` on shutdown. No wrapper class, no indirection
-# layer — the loop owns the gateway lifecycle explicitly.
-imap = IMAPClient(account)
+# The loop (P2-005) calls them directly: `await connect()` once at startup,
+# `await disconnect()` on shutdown. No wrapper class, no indirection layer —
+# the loop owns the gateway lifecycle explicitly. The pool returns cached
+# but NOT-yet-connected clients, so the explicit connect() is still required.
 await imap.connect()
 try:
     ids = await imap.search(folder="INBOX", criteria="UNSEEN")
@@ -218,36 +221,33 @@ try:
 finally:
     await imap.disconnect()
 
-smtp = SMTPClient(account)
-await smtp.connect()
-try:
-    # Every send is a reply — always reply_email (no send_email fallback).
-    await smtp.reply_email(to=[sender], subject=f"Re: {subject}",
-                           html_body=reply_html, in_reply_to=msg_id)
-finally:
-    await smtp.disconnect()
+# SMTPClient is fire-and-forget per send (no connect()/disconnect()).
+await smtp.reply_email(to=[sender], subject=f"Re: {subject}",
+                       html_body=reply_html, in_reply_to=msg_id)
 ```
 
 **Errata (P1-003 cross-domain review):** an earlier version of this section
 showed `async with IMAPClient(account) as imap:`. That is inaccurate —
 simple_email_gw 0.3.0 `IMAPClient`/`SMTPClient` are NOT async context
 managers; they expose explicit `connect()`/`disconnect()` methods. The loop
-calls those methods directly (construct once, `await imap.connect()` once,
-`await imap.disconnect()` on shutdown). There is NO `Mailbox` wrapper class
-and no seam object with `__aenter__`/`__aexit__` or `connect()`/`close()`
-methods — an earlier design proposed one, but it was descoped per owner
-feedback (wrapping two existing classes in a third class added no benefit
-for a demo/tutorial). The method signatures and behaviour described below
-remain correct.
+calls those methods directly (construct once via the pool, `await
+imap.connect()` once, `await imap.disconnect()` on shutdown). There is NO
+`Mailbox` wrapper class and no seam object with `__aenter__`/`__aexit__` or
+`connect()`/`close()` methods — an earlier design proposed one, but it was
+descoped per owner feedback (wrapping two existing classes in a third class
+added no benefit for a demo/tutorial). The method signatures and behaviour
+described below remain correct.
 
 `EmailAccount` fields: `name`, `imap_host`, `smtp_host`, `username`,
-`password`. Configuration can come from env vars
-(`EMAIL_IMAP_HOST`, `EMAIL_SMTP_HOST`, `EMAIL_USERNAME`, `EMAIL_PASSWORD`) or
-a multi-account JSON (`EMAIL_ACCOUNTS_JSON`).
+`password`. Configuration is read by the SDK's `ServerConfig` from env vars
+(`EMAIL_IMAP_HOST`, `EMAIL_SMTP_HOST`, `EMAIL_USERNAME`, `EMAIL_PASSWORD`)
+or a multi-account JSON (`EMAIL_ACCOUNTS_JSON`). The loop does not parse
+these — it passes the literal account name `"default"` to the pool.
 
-**Seam decision (confirmed):** async `IMAPClient`/`SMTPClient` called
-directly from yoker's async loop. This avoids running two event loops
-(yoker's + the sync wrapper's background thread) and is the clean fit for an
+**Seam decision (confirmed):** async `IMAPClient`/`SMTPClient` obtained from
+`ConnectionPool` and called directly from yoker's async loop. This avoids
+running two event loops (yoker's + the sync wrapper's background thread),
+delegates account/env-var parsing to the SDK, and is the clean fit for an
 async-native SDK.
 
 ## 3. The c3 → yoker-assistant Porting Map
@@ -541,10 +541,26 @@ Three configuration concerns, kept separate (no bleeding):
 
 ### 5.1 Email account (`simple-email-gw`)
 
-- `EmailAccount`: `name`, `imap_host`, `smtp_host`, `username`, `password`.
-- Sourced from environment variables
-  (`EMAIL_IMAP_HOST`, `EMAIL_SMTP_HOST`, `EMAIL_USERNAME`, `EMAIL_PASSWORD`)
-  or a `.env` file, consistent with `simple-email-gw`'s own conventions.
+- The loop does NOT parse `EMAIL_*` env vars itself. It obtains IMAP/SMTP
+  clients from the SDK's ``ConnectionPool`` via the literal account name
+  ``"default"`` (the SDK's ``ServerConfig.account_name`` default):
+  ```python
+  pool = await get_pool()
+  imap = await pool.get_imap_client("default")
+  smtp = await pool.get_smtp_client("default")
+  await imap.connect()  # pool returns cached-but-unconnected clients
+  ```
+- ``EmailAccount`` fields (`name`, `imap_host`, `smtp_host`, `username`,
+  `password`) and their env-var sources (`EMAIL_IMAP_HOST`, `EMAIL_SMTP_HOST`,
+  `EMAIL_USERNAME`, `EMAIL_PASSWORD`, or `EMAIL_ACCOUNTS_JSON` for multi-account)
+  are read inside the SDK's ``ServerConfig`` — yoker-assistant's only account
+  knowledge is the name ``"default"``.
+- IMAP connection lifetime: held active for the loop's lifetime (one
+  ``connect()`` at startup for fast-fail on bad credentials, one
+  ``disconnect()`` in the ``finally`` block). A reconnect-on-failure guard
+  wraps ``imap.search`` so a dropped idle connection (after the 60s sleep)
+  triggers one ``disconnect()`` + ``connect()`` + retry rather than killing
+  the loop.
 - Loop parameters: `poll_interval` (seconds, default 60), `archive_folder`
   (default `Archive`), `inbox_folder` (default `INBOX`).
 
@@ -622,11 +638,12 @@ the current message, close IMAP/SMTP connections, exit.
     intentional-silence signal and is handled separately (mark + archive).
   - Unexpected exception per message: log, skip the message (leave it
     `UNSEEN` so it is retried), continue the loop.
-  - **C1 startup guard:** the loop refuses to start when
-    `EMAIL_RECIPIENT_WHITELIST_ADDRESSES` is unset — the recipient whitelist
-    fails open, so an unset whitelist would let the assistant reply to
-    arbitrary senders. `run()` raises `RuntimeError` before constructing
-    the `Agent`.
+  - **C1 startup guard:** the loop refuses to start when the recipient
+    whitelist is disabled — the whitelist fails open, so an unset whitelist
+    would let the assistant reply to arbitrary senders. `run()` raises
+    `RuntimeError` (citing `EMAIL_RECIPIENT_DOMAINS`,
+    `EMAIL_RECIPIENT_ADDRESSES`, or `EMAIL_RECIPIENT_WHITELIST_JSON`) before
+    constructing the `Agent`.
 - **Graceful shutdown:** on signal, stop accepting new messages, finish the
   in-flight message, close connections, exit 0.
 - **No background concurrency in the first pass:** one loop, one message at a
