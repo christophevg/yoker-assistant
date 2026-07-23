@@ -7,6 +7,8 @@ Covers ``build_message`` (the P2-006 handoff payload function), the
 
 from __future__ import annotations
 
+import asyncio
+import logging
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -15,6 +17,7 @@ import pytest
 from yoker_assistant.loop import (
   NO_REPLY_SENTINEL,
   _contains_unsafe_html,
+  _load_assistant_definition,
   _process_one,
   build_message,
   run,
@@ -205,6 +208,16 @@ async def test_process_one_valid_reply_sends_html_then_marks_and_archives() -> N
 # ---------------------------------------------------------------------------
 
 
+async def test_process_one_logs_conversation_turns(caplog: pytest.LogCaptureFixture) -> None:
+  """Conversation-style INFO logs frame the incoming handoff and the agent reply."""
+  imap, smtp, agent = _make_clients("<p>Hello.</p>")
+  with caplog.at_level(logging.INFO, logger="yoker_assistant.loop"):
+    await _process_one(imap, smtp, agent, "1")
+  records = "\n".join(r.getMessage() for r in caplog.records)
+  assert "=== Incoming message (user turn) ===" in records
+  assert "=== Agent reply ===" in records
+
+
 async def test_run_refuses_to_start_when_whitelist_disabled(
   monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -299,24 +312,67 @@ async def test_run_continues_after_process_one_exception(
   imap.disconnect.assert_awaited_once()
 
 
-async def test_run_reconnects_after_search_failure(monkeypatch: pytest.MonkeyPatch) -> None:
-  """Dropped idle connection: search fails → disconnect → reconnect → search succeeds."""
+# ---------------------------------------------------------------------------
+# Per-iteration connect/disconnect + agent-definition loader
+# ---------------------------------------------------------------------------
+
+
+async def test_run_connects_and_disconnects_per_iteration(
+  monkeypatch: pytest.MonkeyPatch,
+) -> None:
+  """Each loop iteration bookends with connect/disconnect (no persistent connection)."""
   _enable_whitelist(monkeypatch)
 
-  imap = _make_imap()
-  # First search raises, second (after reconnect) succeeds with empty result.
-  imap.search = AsyncMock(side_effect=[ConnectionError("dropped"), []])
+  imap = _make_imap(search_result=[])
   smtp = _make_smtp()
   _mock_pool(monkeypatch, imap, smtp)
 
   agent = MagicMock()
   agent.process = AsyncMock(return_value=NO_REPLY_SENTINEL)
   monkeypatch.setattr("yoker_assistant.loop.Agent", lambda **kwargs: agent)
+  # No sleep between iterations.
+  monkeypatch.setattr("yoker_assistant.loop._POLL_INTERVAL", 0)
 
-  await run(once=True)
+  # Stop the loop from inside the second connect — proves a second iteration ran.
+  stop = asyncio.Event()
+  monkeypatch.setattr("yoker_assistant.loop.asyncio.Event", lambda: stop)
 
-  # Reconnect path: disconnect (tolerating failure) + connect + retry search.
-  assert imap.search.await_count == 2
-  imap.disconnect.assert_awaited()
-  # connect() is called once at startup, once on reconnect.
+  call_count = 0
+
+  async def _stop_after_two() -> None:
+    nonlocal call_count
+    call_count += 1
+    if call_count == 2:
+      stop.set()
+
+  imap.connect = AsyncMock(side_effect=_stop_after_two)
+
+  await run(once=False)
+
   assert imap.connect.await_count == 2
+  assert imap.disconnect.await_count == 2
+
+
+def test_load_assistant_definition_raises_when_directory_missing(
+  monkeypatch: pytest.MonkeyPatch,
+) -> None:
+  """Missing agents/ directory in the package raises RuntimeError."""
+  monkeypatch.setattr("yoker_assistant.loop.find_package_subdirectory", lambda pkg, sub: None)
+  with pytest.raises(RuntimeError, match="directory not found"):
+    _load_assistant_definition()
+
+
+def test_load_assistant_definition_returns_assistant(
+  tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+  """A packaged assistant.md yields an AgentDefinition with simple_name 'assistant'."""
+  (tmp_path / "assistant.md").write_text(
+    "---\nname: assistant\ndescription: test agent\ntools: []\n---\n# body\n",
+    encoding="utf-8",
+  )
+  monkeypatch.setattr(
+    "yoker_assistant.loop.find_package_subdirectory",
+    lambda pkg, sub: tmp_path,
+  )
+  defn = _load_assistant_definition()
+  assert defn.simple_name == "assistant"
