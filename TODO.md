@@ -192,7 +192,7 @@ new bounded tools remain Phase B and are deliberately absent.
 
 ### P2 — Port the skills
 
-- [ ] **P2-002: Evaluate pa-inbox concepts and optionally split off skill sub-workflows**
+- [x] **P2-002: Evaluate pa-inbox concepts and optionally split off skill sub-workflows** ✅ (2026-07-23, evaluation only — no changes needed, concepts already in assistant.md)
   - **NOT a port.** The old `../c3/skills/pa-inbox/SKILL.md` is "old" — it
     targets the old assistant operating with an `inbox/` folder and files,
     before the assistant had access to an actual email account. Evaluate the
@@ -210,7 +210,7 @@ new bounded tools remain Phase B and are deliberately absent.
     where applicable.
   - **Satisfies:** port skills (reframed as evaluation)
 
-- [ ] **P2-003: Evaluate pa-outbox concepts and optionally split off skill sub-workflows**
+- [x] **P2-003: Evaluate pa-outbox concepts and optionally split off skill sub-workflows** ✅ (2026-07-23, evaluation only — no changes needed, concepts already in assistant.md)
   - **NOT a port.** The old `../c3/skills/pa-outbox/SKILL.md` is "old" — it
     targets the old assistant's file-based outbox workflow. Evaluate the
     concepts captured in it (reply format: Actions Taken, Memory Created,
