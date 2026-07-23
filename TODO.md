@@ -478,7 +478,7 @@ new bounded tools remain Phase B and are deliberately absent.
 
 ### P4 — Documentation (tutorial)
 
-- [ ] **P4-001: Write the "how was this built?" tutorial README**
+- [x] **P4-001: Write the "how was this built?" tutorial README** ✅ (2026-07-23, PR #9)
   - Per STANDARDS.md doc voice: a reader follows the journey from empty repo
     to working package and understands each decision. Cover: why this exists
     (c3 heritage, the email-loop-moved-to-Python insight), the two halves
