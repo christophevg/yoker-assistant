@@ -465,8 +465,8 @@ new bounded tools remain Phase B and are deliberately absent.
     with a deliberate path-dep injection in a throwaway build.
   - **Satisfies:** security (publish guard)
 
-- [ ] **S-03: File upstream issue against simple-email-gw for wrong env var
-  names in its README**
+- [x] **S-03: File upstream issue against simple-email-gw for wrong env var
+  names in its README** ✅ (2026-07-23) — https://github.com/christophevg/simple-email-gw/issues/3
   - Its README documents the wrong env var names
     (`EMAIL_RECIPIENT_ADDRESSES` vs the actual
     `EMAIL_RECIPIENT_WHITELIST_ADDRESSES` binding). Same bug affects all
