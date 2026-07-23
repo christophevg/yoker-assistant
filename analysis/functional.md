@@ -103,29 +103,34 @@ surface, confirmed against `yoker/examples/library_usage.py` and
 `yoker/src/yoker/core/__init__..py`, is:
 
 ```python
-from yoker import Agent
+from yoker.config import get_yoker_config
+from yoker.session import Session
 
-# Constructed ONCE at startup with a persistent context manager. The agent
-# definition is loaded from the installed package's agents/ directory via
-# importlib.resources (no relative filesystem path) — see §2.3.1.
-agent = Agent(agent_definition=_load_assistant_definition(),
-              context_manager=Persisted(SimpleContextManager(),
-                                         session_id="yoker-assistant"))
-# Each email is the next user message in the SAME session.
-response = await agent.process(message)         # returns the agent's text
+config = get_yoker_config()
+config.agent = "yoker_assistant:assistant"  # resolved by name from the registry
+# Session is constructed ONCE at startup and owns the agent registry, the
+# primary Agent, persistence (via config.context), and the `agent` tool.
+async with Session(config, session_id="yoker-assistant") as session:
+    agent = session.agent
+    # Each email is the next user message in the SAME session.
+    response = await agent.process(message)  # returns the agent's text
 ```
 
 Key facts of the seam:
 
-- `Agent.__init__(config=None, agent_definition=None, agent_path=None,
-  context_manager=None, plugins=(), ...)` — config is discovered from
-  `./yoker.toml` then `~/.yoker.toml` when omitted.
-- `Agent.process(message) -> str` is **async** and returns the agent's final
-  text response. Tool calls happen internally during `process`.
+- `Session(config, *, session_id=None, ...)` requires a `Config` object;
+  config is discovered from `./yoker.toml` then `~/.yoker.toml` via
+  `get_yoker_config()`. `config.agent` is set programmatically to
+  `yoker_assistant:assistant` so Session resolves the assistant by name
+  from the plugin-loaded `AgentRegistry` (no manual definition loader).
+- `session.agent.process(message) -> str` is **async** and returns the
+  agent's final text response. Tool calls happen internally during
+  `process`.
 - A **persistent context manager** keeps the running conversation across
-  `process()` calls; the agent is constructed once and lives for the whole
-  package run. This is what makes the per-email "next user message" model
-  work and is why `pa-session` is dropped (§3.4).
+  `process()` calls; the Session is constructed once and lives for the
+  whole package run (the loop body is inside the `async with Session:`
+  block). This is what makes the per-email "next user message" model work
+  and is why `pa-session` is dropped (§3.4).
 - Agent definitions are markdown files with YAML frontmatter (`name`,
   `description`, `tools`, optional `model`). Built-in tools may be referenced
   with or without the `yoker:` prefix and are matched case-insensitively;
@@ -178,11 +183,13 @@ dual-mode. The clean code shape:
   local dev (when the cwd is the checkout) and there it clobbers the
   user's backend/model config. The user's `~/.yoker.toml` is the
   correct location for plugin registration.
-- The `Agent` is constructed with `agent_definition=_load_assistant_definition()`
-  (the definition is loaded from the installed package's `agents/` directory
-  via `find_package_subdirectory` + `load_agent_definitions` — no relative
-  filesystem path that would break when the package is installed). Plugins
-  load from `~/.yoker.toml` automatically. No `plugins=()` arg is needed.
+- The `Agent` is resolved by name (`yoker_assistant:assistant`) from the
+  `Session`'s `AgentRegistry`, which the plugin loader populates from the
+  installed package's `agents/` directory (declared via
+  `agents_dir="agents"` in `__YOKER_MANIFEST__`). No manual definition
+  loader, no relative filesystem path that would break when the package is
+  installed. Plugins load from `~/.yoker.toml` automatically. No
+  `plugins=()` arg is needed.
 - External consumers load yoker-assistant's tools the IDENTICAL way:
   `pip install yoker-assistant` plus the same `[plugins]` /
   `[plugins.trusted]` lines in their `~/.yoker.toml`. Self-consumption
@@ -285,18 +292,19 @@ what is kept verbatim and what is reworked is stated explicitly.
 ### 3.1 The agent definition (`src/yoker_assistant/agents/assistant.md`)
 
 The agent definition is **packaged inside the yoker_assistant package**
-(`src/yoker_assistant/agents/assistant.md`) and loaded at runtime via
-`find_package_subdirectory("yoker_assistant", "agents")` +
-`load_agent_definitions` — the same primitives yoker's plugin loader uses.
-This fixes the relative-path fragility the owner flagged in PR #7 round 2
+(`src/yoker_assistant/agents/assistant.md`) and discovered at runtime by
+yoker's plugin loader via the manifest's `agents_dir="agents"` field. This
+fixes the relative-path fragility the owner flagged in PR #7 round 2
 ("a file path won't work when the assistant is run from a package"). The
-manifest's `agents_dir="agents"` field lets external yoker consumers
-reference the agent as `yoker_assistant:assistant` via their `Session`'s
-registry. Name-based resolution from the bare `Agent` the loop uses is
-NOT supported by the yoker SDK today (the bare `Agent` has no agent
-registry — only `Session` does); an upstream yoker issue has been filed
-for that feature. Until then, the loop passes the loaded `AgentDefinition`
-explicitly as `agent_definition=`.
+loop constructs a `Session` and sets `config.agent =
+"yoker_assistant:assistant"`, so Session resolves the assistant by name
+from the plugin-loaded `AgentRegistry` — no manual definition loader in
+the loop. External yoker consumers reference the agent the same way
+(`yoker_assistant:assistant`) via their own `Session`'s registry. The
+`agent` tool is injected by Session (gated by
+`config.tools.agent.enabled`, default True); populating the assistant's
+`agents:` allowlist in `assistant.md` is a separate follow-up so the
+tool can actually spawn sub-agents.
 
 | Element | c3 original | yoker-assistant | Verdict |
 |---|---|---|---|
