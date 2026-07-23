@@ -78,6 +78,19 @@ single owner address; leaving it broad allows the agent to reply to
 arbitrary senders. This is a `simple-email-gw` config concern, not package
 code.
 
+## Security configuration
+
+Marking `[plugins.trusted] yoker_assistant = true` admits ALL tool code
+from this package as trusted with no per-call gate — pin the installed
+version (`uv pip install yoker-assistant==<version>`) and verify the
+source. Adding a new tool to `__YOKER_MANIFEST__`, or making a
+capability-changing edit to an existing tool, is a security-relevant
+change; see [`SECURITY.md`](SECURITY.md) for the review process
+contributors must follow before such a change. The
+`EMAIL_RECIPIENT_WHITELIST_ADDRESSES` env var is the primary reply-safety
+boundary (see `.env` section above). `make pre-publish` guards against
+local-path dependencies leaking into published metadata.
+
 ## License
 
 MIT

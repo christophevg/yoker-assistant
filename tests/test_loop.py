@@ -69,6 +69,25 @@ def test_build_message_preserves_body_verbatim() -> None:
   assert build_message(msg).endswith("line1\nline2\r\nline3")
 
 
+def test_build_message_omits_instructions_block() -> None:
+  """The per-email payload must NOT contain an Instructions: block.
+
+  Identity/instructions live in the agent definition + the one-time
+  session-setup turn (P1-004), not in each email's handoff. This is the
+  regression test that would fire if someone reintroduced the old
+  c3-style instructions header.
+  """
+  msg = {
+    "from": "owner@example.com",
+    "subject": "What's on my plate today?",
+    "date": "Mon, 1 Jan 2026 09:00:00 +0000",
+    "body": "Give me a status update.",
+  }
+  out = build_message(msg)
+  for line in out.splitlines():
+    assert not line.lower().startswith("instructions:")
+
+
 # ---------------------------------------------------------------------------
 # _contains_unsafe_html
 # ---------------------------------------------------------------------------
@@ -188,9 +207,22 @@ async def test_process_one_guard_failure_marks_no_archive_sends_notice() -> None
 
 
 async def test_process_one_valid_reply_sends_html_then_marks_and_archives() -> None:
-  """Branch 4: valid HTML → reply_email with html_body + mark read + archive."""
+  """Branch 4: valid HTML → reply_email with html_body + mark read + archive.
+
+  Ordering is send → mark → archive per §7; a regression that swapped
+  mark-before-send would break the ``order`` assertion.
+  """
   imap, smtp, agent = _make_clients("<p>Hello.</p>")
+
+  order: list[str] = []
+  smtp.reply_email.side_effect = lambda *a, **kw: order.append("reply")
+  imap.mark_message.side_effect = lambda *a, **kw: order.append("mark")
+  imap.move_message.side_effect = lambda *a, **kw: order.append("archive")
+
   await _process_one(imap, smtp, agent, "1")
+
+  assert order == ["reply", "mark", "archive"]
+
   smtp.reply_email.assert_awaited_once()
   call = smtp.reply_email.call_args
   assert call.kwargs["to"] == "owner@example.com"
@@ -200,6 +232,22 @@ async def test_process_one_valid_reply_sends_html_then_marks_and_archives() -> N
   assert call.kwargs["in_reply_to"] == "<orig@example.com>"
   imap.mark_message.assert_awaited_once_with("1", "INBOX", "\\Seen", action="add")
   imap.move_message.assert_awaited_once_with("1", "INBOX", "Archive")
+
+
+async def test_process_one_send_failure_does_not_archive() -> None:
+  """If smtp.reply_email raises, the message is NOT marked read or archived.
+
+  §7 error handling: agent/send failure does not mark read. The exception
+  propagates out of _process_one to run()'s per-message except block; the
+  mark/archive calls are never reached.
+  """
+  imap, smtp, agent = _make_clients("<p>Hello.</p>")
+  smtp.reply_email = AsyncMock(side_effect=RuntimeError("smtp boom"))
+  with pytest.raises(RuntimeError, match="smtp boom"):
+    await _process_one(imap, smtp, agent, "1")
+  smtp.reply_email.assert_awaited_once()
+  imap.mark_message.assert_not_awaited()
+  imap.move_message.assert_not_awaited()
 
 
 # ---------------------------------------------------------------------------
