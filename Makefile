@@ -59,7 +59,7 @@ docs-view: docs ## Build and open documentation in browser
 build: ## Build distribution packages
 	uv build
 
-pre-publish: check ## Pre-publication checks (run before publishing)
+pre-publish: check build ## Pre-publication checks (run before publishing)
 	@echo "Checking for relative image paths in README..."
 	@grep -n '!\[.*](media/' README.md && (echo "ERROR: Relative image paths found - use raw GitHub URLs for PyPI"; exit 1) || echo "OK: No relative image paths"
 	@echo "Checking version sync..."
@@ -70,6 +70,17 @@ pre-publish: check ## Pre-publication checks (run before publishing)
 		exit 1; \
 	fi; \
 	echo "OK: Versions match ($$VERSION_PY)"
+	@echo "Checking built distribution metadata for non-registry source URLs..."
+	@uv run twine check dist/* >/dev/null
+	@hits=$$( { for whl in dist/*.whl; do [ -e "$$whl" ] && unzip -p "$$whl" '*.dist-info/METADATA' 2>/dev/null; done; \
+		for sdist in dist/*.tar.gz; do [ -e "$$sdist" ] && tar -xzOf "$$sdist" --wildcards '*/PKG-INFO' 2>/dev/null; done; } \
+		| grep -nE '(^Requires-Dist:.*@|file://|git\+|hg\+|svn\+|bzr\+|path = )' ); \
+	if [ -n "$$hits" ]; then \
+		echo "ERROR: non-registry source URLs found in built metadata:"; \
+		echo "$$hits"; \
+		exit 1; \
+	fi; \
+	echo "OK: No non-registry source URLs in built metadata"
 	@echo "Pre-publication checks passed"
 
 publish: clean build ## Publish to PyPI (runs pre-publish checks)

@@ -228,7 +228,7 @@ new bounded tools remain Phase B and are deliberately absent.
     where applicable.
   - **Satisfies:** port skills (reframed as evaluation)
 
-- [ ] **P2-004: Record decision to drop pa-session**
+- [x] **P2-004: Record decision to drop pa-session** ✅ (2026-07-23, PR #8)
   - Decision: DROP `pa-session` entirely. yoker's persistent context manager
     (used by P1-004/P2-005) carries session state natively across `process()`
     calls — the agent remembers the running conversation across emails without
@@ -372,8 +372,8 @@ new bounded tools remain Phase B and are deliberately absent.
     shape.
   - **Satisfies:** handoff contract
 
-- [ ] **P2-007: Wire reply sending with correct threading (HTML)** —
-  FOLDED INTO P2-005
+- [x] **P2-007: Wire reply sending with correct threading (HTML)** —
+  FOLDED INTO P2-005 ✅ (2026-07-23, PR #8)
   - **No remaining scope.** The reply sending is a single
     `smtp.reply_email(...)` call in the loop (P2-005). The `Re:` subject
     string and the `in_reply_to=msg["message_id"]` passthrough are
@@ -424,7 +424,7 @@ new bounded tools remain Phase B and are deliberately absent.
     boundary; the skip-on-empty-reply-body behaviour is asserted.
   - **Satisfies:** tests (polling + html_body= routing)
 
-- [ ] ~~**P3-003: Tests for the mailbox seam**~~ — DROPPED
+- [x] ~~**P3-003: Tests for the mailbox seam**~~ — DROPPED ✅ (2026-07-23, folded into P3-002)
   - **Dropped — P1-003's `Mailbox` seam was descoped.** There is no seam
     module to test. The `html_body=` routing regression test that lived
     in the descoped `test_mailbox.py` has been absorbed into P3-002
