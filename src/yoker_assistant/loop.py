@@ -1,7 +1,8 @@
 """The main email-polling loop.
 
-Polls an IMAP inbox for UNSEEN messages, hands each to the yoker ``Agent`` as
-a From/Subject/Date/body payload, and branches on the agent's reply:
+Polls an IMAP inbox for UNSEEN messages, hands each to the yoker assistant
+agent (resolved by name from the plugin registry via :class:`yoker.Session`)
+as a From/Subject/Date/body payload, and branches on the agent's reply:
 
   1. ``{{NO_REPLY}}`` sentinel  → intentional silence: mark read + archive.
   2. empty/whitespace reply     → transient problem: leave UNSEEN for retry.
@@ -10,8 +11,8 @@ a From/Subject/Date/body payload, and branches on the agent's reply:
   4. valid HTML reply           → send reply + mark read + archive.
 
 ``build_message`` is a plain function (P2-006, per owner instruction). No
-``handoff.py`` module, no wrapper classes — the loop calls ``Agent``,
-``IMAPClient``, and ``SMTPClient`` directly.
+``handoff.py`` module, no wrapper classes — the loop drives ``Session.agent``
+and calls ``IMAPClient`` / ``SMTPClient`` directly.
 """
 
 import asyncio
@@ -23,9 +24,9 @@ from typing import Any
 
 from simple_email_gw import IMAPClient, SMTPClient, get_pool
 from simple_email_gw.config import get_recipient_whitelist
-from yoker import Agent, Persisted, SimpleContextManager
-from yoker.agents import AgentDefinition, load_agent_definitions
-from yoker.resources import find_package_subdirectory
+from yoker.config import get_yoker_config
+from yoker.core import Agent
+from yoker.session import Session
 
 logger = logging.getLogger(__name__)
 
@@ -40,25 +41,6 @@ _ACCOUNT_NAME = "default"
 
 _UNSAFE_TAGS = ("<script", "<style", "<img", "<iframe", "<object", "<embed", "<form")
 _UNSAFE_HANDLER = re.compile(r"\son\w+\s*=")
-
-_ASSISTANT_AGENT_NAME = "assistant"
-
-
-def _load_assistant_definition() -> AgentDefinition:
-  """Load the assistant agent definition from the installed package.
-
-  Uses the same mechanism as yoker's plugin loader
-  (``find_package_subdirectory`` + ``load_agent_definitions``) so the
-  definition ships inside the wheel and is located via
-  :mod:`importlib.resources` at runtime — no relative filesystem path.
-  """
-  directory = find_package_subdirectory("yoker_assistant", "agents")
-  if directory is None:
-    raise RuntimeError("yoker_assistant.agents/ directory not found in the installed package")
-  for defn in load_agent_definitions(directory, namespace="yoker_assistant"):
-    if defn.simple_name == _ASSISTANT_AGENT_NAME:
-      return defn
-  raise RuntimeError(f"agent '{_ASSISTANT_AGENT_NAME}' not found in yoker_assistant.agents")
 
 
 def _contains_unsafe_html(html: str) -> bool:
@@ -144,7 +126,13 @@ async def _process_one(
 
 
 async def run(once: bool = False) -> None:
-  """The main loop. Constructs the Agent once, polls IMAP, processes messages.
+  """The main loop. Constructs a yoker ``Session`` once, polls IMAP, processes messages.
+
+  The assistant agent is resolved by name (``yoker_assistant:assistant``)
+  from the Session's plugin-loaded :class:`AgentRegistry`, replacing the
+  former bare-``Agent`` + ``_load_assistant_definition`` construction. The
+  entire loop body lives inside the ``async with Session`` block so the
+  Session owns the agent registry, the ``agent`` tool, and clean shutdown.
 
   Refuses to start when the recipient whitelist is disabled (C1 blocking fix):
   the whitelist fails open, so an unset whitelist would let the assistant reply
@@ -159,56 +147,57 @@ async def run(once: bool = False) -> None:
       "or EMAIL_RECIPIENT_WHITELIST_JSON to enable outgoing reply safety."
     )
 
-  agent = Agent(
-    agent_definition=_load_assistant_definition(),
-    context_manager=Persisted(SimpleContextManager(), session_id="yoker-assistant"),
-  )
+  config = get_yoker_config()
+  config.agent = "yoker_assistant:assistant"
 
-  # One-time session-setup turn (§4.1).
-  await agent.process(_INITIALIZE_PROMPT)
+  async with Session(config, session_id="yoker-assistant") as session:
+    agent = session.agent
 
-  # The pool reads the EMAIL_* env vars via ServerConfig and caches clients.
-  # Returned clients are NOT yet connected — the loop connects per iteration.
-  pool = await get_pool()
-  imap = await pool.get_imap_client(_ACCOUNT_NAME)
-  smtp = await pool.get_smtp_client(_ACCOUNT_NAME)  # fire-and-forget per send
+    # One-time session-setup turn (§4.1).
+    await agent.process(_INITIALIZE_PROMPT)
 
-  stop = asyncio.Event()
-  loop = asyncio.get_running_loop()
-  for sig in (SIGINT, SIGTERM):
-    try:
-      loop.add_signal_handler(sig, stop.set)
-    except NotImplementedError:
-      # Windows — signal handlers not supported on this event loop.
-      pass
+    # The pool reads the EMAIL_* env vars via ServerConfig and caches clients.
+    # Returned clients are NOT yet connected — the loop connects per iteration.
+    pool = await get_pool()
+    imap = await pool.get_imap_client(_ACCOUNT_NAME)
+    smtp = await pool.get_smtp_client(_ACCOUNT_NAME)  # fire-and-forget per send
 
-  # Connect/disconnect bookend each iteration. The poll interval is several
-  # minutes, so holding a connection open across the sleep would just time
-  # out server-side. The first iteration's connect is the credential check.
-  while not stop.is_set():
-    await imap.connect()
-    try:
-      uids = await imap.search(_INBOX_FOLDER, "UNSEEN")
-      for mid in uids:
-        if stop.is_set():
-          break
-        try:
-          await _process_one(imap, smtp, agent, mid)
-        except Exception:
-          # §7: per-message exceptions are logged and skipped. The message
-          # stays UNSEEN (not marked read) → retried next iteration.
-          logger.exception("per-message failure; leaving UNSEEN", extra={"message_id": mid})
-          continue
-    finally:
+    stop = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    for sig in (SIGINT, SIGTERM):
       try:
-        await imap.disconnect()
-      except Exception:
-        logger.exception("imap disconnect failed")
-
-    if once:
-      break
-    if not uids:
-      try:
-        await asyncio.wait_for(stop.wait(), timeout=_POLL_INTERVAL)
-      except asyncio.TimeoutError:
+        loop.add_signal_handler(sig, stop.set)
+      except NotImplementedError:
+        # Windows — signal handlers not supported on this event loop.
         pass
+
+    # Connect/disconnect bookend each iteration. The poll interval is several
+    # minutes, so holding a connection open across the sleep would just time
+    # out server-side. The first iteration's connect is the credential check.
+    while not stop.is_set():
+      await imap.connect()
+      try:
+        uids = await imap.search(_INBOX_FOLDER, "UNSEEN")
+        for mid in uids:
+          if stop.is_set():
+            break
+          try:
+            await _process_one(imap, smtp, agent, mid)
+          except Exception:
+            # §7: per-message exceptions are logged and skipped. The message
+            # stays UNSEEN (not marked read) → retried next iteration.
+            logger.exception("per-message failure; leaving UNSEEN", extra={"message_id": mid})
+            continue
+      finally:
+        try:
+          await imap.disconnect()
+        except Exception:
+          logger.exception("imap disconnect failed")
+
+      if once:
+        break
+      if not uids:
+        try:
+          await asyncio.wait_for(stop.wait(), timeout=_POLL_INTERVAL)
+        except asyncio.TimeoutError:
+          pass

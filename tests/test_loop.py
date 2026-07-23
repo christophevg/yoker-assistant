@@ -17,7 +17,6 @@ import pytest
 from yoker_assistant.loop import (
   NO_REPLY_SENTINEL,
   _contains_unsafe_html,
-  _load_assistant_definition,
   _process_one,
   build_message,
   run,
@@ -267,6 +266,23 @@ def _make_smtp() -> MagicMock:
   return smtp
 
 
+def _mock_session(monkeypatch: pytest.MonkeyPatch, agent: MagicMock) -> MagicMock:
+  """Patch get_yoker_config + Session so run() yields ``session.agent = agent``.
+
+  Session is replaced with a sync callable returning a MagicMock that also
+    advertises async ``__aenter__`` / ``__aexit__`` so ``async with`` works.
+  """
+  config = MagicMock()
+  monkeypatch.setattr("yoker_assistant.loop.get_yoker_config", lambda: config)
+
+  session = MagicMock()
+  session.agent = agent
+  session.__aenter__ = AsyncMock(return_value=session)
+  session.__aexit__ = AsyncMock(return_value=None)
+  monkeypatch.setattr("yoker_assistant.loop.Session", lambda *a, **kw: session)
+  return session
+
+
 async def test_run_proceeds_when_whitelist_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
   """C1 happy path: run() does not raise when whitelist is enabled."""
   _enable_whitelist(monkeypatch)
@@ -277,7 +293,7 @@ async def test_run_proceeds_when_whitelist_enabled(monkeypatch: pytest.MonkeyPat
 
   agent = MagicMock()
   agent.process = AsyncMock(return_value=NO_REPLY_SENTINEL)
-  monkeypatch.setattr("yoker_assistant.loop.Agent", lambda **kwargs: agent)
+  _mock_session(monkeypatch, agent)
 
   # Should not raise — proceeds to connect + search, then breaks (once + empty).
   await run(once=True)
@@ -301,7 +317,7 @@ async def test_run_continues_after_process_one_exception(
   # First process call is the Initialize setup turn; then per-message calls:
   # first raises, second succeeds.
   agent.process = AsyncMock(side_effect=[NO_REPLY_SENTINEL, Exception("boom"), "<p>ok</p>"])
-  monkeypatch.setattr("yoker_assistant.loop.Agent", lambda **kwargs: agent)
+  _mock_session(monkeypatch, agent)
 
   # Should not propagate — the per-message exception is caught and logged.
   await run(once=True)
@@ -313,7 +329,7 @@ async def test_run_continues_after_process_one_exception(
 
 
 # ---------------------------------------------------------------------------
-# Per-iteration connect/disconnect + agent-definition loader
+# Per-iteration connect/disconnect
 # ---------------------------------------------------------------------------
 
 
@@ -329,7 +345,7 @@ async def test_run_connects_and_disconnects_per_iteration(
 
   agent = MagicMock()
   agent.process = AsyncMock(return_value=NO_REPLY_SENTINEL)
-  monkeypatch.setattr("yoker_assistant.loop.Agent", lambda **kwargs: agent)
+  _mock_session(monkeypatch, agent)
   # No sleep between iterations.
   monkeypatch.setattr("yoker_assistant.loop._POLL_INTERVAL", 0)
 
@@ -351,28 +367,3 @@ async def test_run_connects_and_disconnects_per_iteration(
 
   assert imap.connect.await_count == 2
   assert imap.disconnect.await_count == 2
-
-
-def test_load_assistant_definition_raises_when_directory_missing(
-  monkeypatch: pytest.MonkeyPatch,
-) -> None:
-  """Missing agents/ directory in the package raises RuntimeError."""
-  monkeypatch.setattr("yoker_assistant.loop.find_package_subdirectory", lambda pkg, sub: None)
-  with pytest.raises(RuntimeError, match="directory not found"):
-    _load_assistant_definition()
-
-
-def test_load_assistant_definition_returns_assistant(
-  tmp_path: Any, monkeypatch: pytest.MonkeyPatch
-) -> None:
-  """A packaged assistant.md yields an AgentDefinition with simple_name 'assistant'."""
-  (tmp_path / "assistant.md").write_text(
-    "---\nname: assistant\ndescription: test agent\ntools: []\n---\n# body\n",
-    encoding="utf-8",
-  )
-  monkeypatch.setattr(
-    "yoker_assistant.loop.find_package_subdirectory",
-    lambda pkg, sub: tmp_path,
-  )
-  defn = _load_assistant_definition()
-  assert defn.simple_name == "assistant"
