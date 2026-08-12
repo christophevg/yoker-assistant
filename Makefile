@@ -1,4 +1,4 @@
--include ~/.claude/Makefile
+-include ~/.yoker/Makefile
 
 .PHONY: env-dev env-run install-pythons test test-cov test-all format format-check lint typecheck check run docs docs-view build pre-publish publish publish-test clean clean-all help
 
@@ -99,4 +99,3 @@ clean: ## Remove build artifacts
 
 clean-all: clean ## Remove virtualenv and lock file
 	rm -rf .venv uv.lock
-

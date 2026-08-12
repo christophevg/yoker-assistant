@@ -5,9 +5,21 @@ Thin CLI wrapper around :func:`yoker_assistant.loop.run`.
 
 import argparse
 import asyncio
+import logging
 import sys
 
 from yoker_assistant.loop import run
+
+# configure logging
+logger = logging.getLogger("yoker-assistant")
+logger.setLevel(logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+ch.setFormatter(formatter)
+logger.addHandler(ch)
+
+logger.info("logging ready...")
 
 
 def main() -> None:

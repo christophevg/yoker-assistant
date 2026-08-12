@@ -24,10 +24,7 @@ classifiers = [
 ]
 keywords = ["yoker", "agent", "email", "assistant"]
 dependencies = [
-  # yoker-as-SDK: the Agent + agent_path + process seam lands in 0.8.0
-  # (functional.md §2.3). Pin the lower bound so the published wheel
-  # pulls a version with the SDK surface this package depends on.
-  "yoker>=0.8.0",
+  "yoker>=0.10.1",
   # Email gateway — async IMAPClient/SMTPClient + EmailAccount env contract
   # (functional.md §2.4). 0.3.0 is the current published line.
   "simple-email-gw>=0.3.0",
@@ -35,6 +32,8 @@ dependencies = [
   # not imported directly. Pin the published version so plugin loading
   # resolves a known-compatible release.
   "pkgq>=0.3.2",
+  "rich>=15.0.0",
+  "pyfiglet>=1.0.4",
 ]
 
 [project.optional-dependencies]
@@ -67,6 +66,10 @@ yoker-assistant = "yoker_assistant.__main__:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/yoker_assistant"]
+core-metadata-version = "2.4"
+
+[tool.hatch.build.targets.sdist]
+core-metadata-version = "2.4"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -141,3 +144,6 @@ base_python = ["python3.11"]
 
 [tool.tox.env.py312]
 base_python = ["python3.12"]
+
+[tool.uv.sources]
+yoker = { path = "../yoker", editable = true }

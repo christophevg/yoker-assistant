@@ -8,7 +8,6 @@ Covers ``build_message`` (the P2-006 handoff payload function), the
 from __future__ import annotations
 
 import asyncio
-import logging
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -255,14 +254,20 @@ async def test_process_one_send_failure_does_not_archive() -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_process_one_logs_conversation_turns(caplog: pytest.LogCaptureFixture) -> None:
-  """Conversation-style INFO logs frame the incoming handoff and the agent reply."""
+async def test_process_one_outputs_handoff_to_ui(monkeypatch: pytest.MonkeyPatch) -> None:
+  """The incoming handoff is sent to the UI handler via output_prompt."""
   imap, smtp, agent = _make_clients("<p>Hello.</p>")
-  with caplog.at_level(logging.INFO, logger="yoker_assistant.loop"):
-    await _process_one(imap, smtp, agent, "1")
-  records = "\n".join(r.getMessage() for r in caplog.records)
-  assert "=== Incoming message (user turn) ===" in records
-  assert "=== Agent reply ===" in records
+  ui_calls: list[str] = []
+  monkeypatch.setattr(
+    "yoker_assistant.loop.ui",
+    MagicMock(
+      output_prompt=lambda text: ui_calls.append(text),
+      output_info=lambda text: None,
+    ),
+  )
+  await _process_one(imap, smtp, agent, "1")
+  assert any("From: Owner <owner@example.com>" in c for c in ui_calls)
+  assert any("Subject: Hi" in c for c in ui_calls)
 
 
 async def test_run_refuses_to_start_when_whitelist_disabled(
@@ -319,6 +324,8 @@ def _mock_session(monkeypatch: pytest.MonkeyPatch, agent: MagicMock) -> MagicMoc
 
   Session is replaced with a sync callable returning a MagicMock that also
     advertises async ``__aenter__`` / ``__aexit__`` so ``async with`` works.
+  Also patches the module-level ``ui`` to a MagicMock so RichUIHandler.start()
+  is not invoked on the mock agent (it would fail on Path.relative_to).
   """
   config = MagicMock()
   monkeypatch.setattr("yoker_assistant.loop.get_yoker_config", lambda: config)
@@ -328,6 +335,16 @@ def _mock_session(monkeypatch: pytest.MonkeyPatch, agent: MagicMock) -> MagicMoc
   session.__aenter__ = AsyncMock(return_value=session)
   session.__aexit__ = AsyncMock(return_value=None)
   monkeypatch.setattr("yoker_assistant.loop.Session", lambda *a, **kw: session)
+  monkeypatch.setattr(
+    "yoker_assistant.loop.ui",
+    MagicMock(
+      start=AsyncMock(),
+      output_prompt=MagicMock(),
+      output_info=MagicMock(),
+      output_error=MagicMock(),
+      console=MagicMock(),
+    ),
+  )
   return session
 
 

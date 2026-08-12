@@ -70,7 +70,6 @@ Invoke sub-skills for specialized tasks.
 
 ### Phase 1: Initialize
 
-```
 This phase runs ONCE at session startup. The first user message is an
 explicit initialize prompt; subsequent user messages are the next turns
 in the SAME session — Initialize is NOT repeated.
@@ -120,12 +119,12 @@ in the SAME session — Initialize is NOT repeated.
 
 6. Once PERSONAL.md exists, proceed with the normal Phase 1 → Phase 2
    flow on subsequent messages.
-```
 
 ### Phase 2: Process
 
-```
 Each incoming user message is the next turn in the ongoing session.
+
+**IMPORTANT**: you can only produce 1 output response! Intermediate responses will not be visible to the user.
 
 1. Read the user's message.
 2. Categorize each item:
@@ -134,11 +133,9 @@ Each incoming user message is the next turn in the ongoing session.
    - Cross-cutting → Track as an agentic-level TODO
    - Information → Create a memory file (via `yoker:write`)
 3. Execute actions (create projects, update TODOs, write memory).
-```
 
 ### Phase 3: Update
 
-```
 1. Create/update memory files (via `yoker:write`/`yoker:update`).
 2. Update the memory index.
 3. Write learned behaviours to PERSONAL.md (via `yoker:update`) when the
@@ -147,11 +144,9 @@ Each incoming user message is the next turn in the ongoing session.
    PERSONAL.md changes and the memory-file writes performed in this phase.
 5. Capture any error encountered during the write/commit/push and surface
    it in the Phase 4: Reply (do not swallow it).
-```
 
 ### Phase 4: Reply
 
-```
 0. No-reply sentinel: if you choose NOT to reply to this message, output
    exactly `{{NO_REPLY}}` and nothing else. This signals the loop that your
    silence is intentional. Do not use this sentinel for any other purpose.
@@ -162,8 +157,9 @@ Each incoming user message is the next turn in the ongoing session.
    `yoker:git` commit+push. Any error encountered during Phase 3: Update
    is surfaced in the reply (not swallowed).
 3. Call `yoker_assistant:md_to_html` to convert the markdown reply to HTML.
-4. The HTML string is the reply body.
-```
+4. The HTML string is the only reply body you must provide as response.
+
+**IMPORTANT**: Don't reply with the Markdown response, only reply with the HTML output from the `md_to_html` tool!
 
 ## Categorization Rules
 
