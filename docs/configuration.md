@@ -84,9 +84,10 @@ these permissions.
 
 `[skills] directories = ["./skills"]` lets yoker load any skills you drop
 into `./skills` in the working directory. The first pass does not ship
-skills (the heritage `pa-*` skills were reworked into the agent definition
-or dropped — see [Porting Map](porting-map.md)); the setting is in the
-reference config so that future skills load without a config change.
+skills (the earlier inbox/reply skills were reworked into the agent
+definition or dropped — see [Design Decisions](design-decisions.md));
+the setting is in the reference config so that future skills load without
+a config change.
 
 ## Assistant personalization — `PERSONAL.md`
 

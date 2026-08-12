@@ -210,7 +210,7 @@ is a session-setup handshake, not an incoming message.
 
 - Process one email per loop iteration (simplest, safest for a showcase).
   Batching is a later optimization, out of scope.
-- Idempotency relies on IMAP flags, exactly as the heritage `pa-email` skill
+- Idempotency relies on IMAP flags: `UNSEEN`
   did: `UNSEEN` search returns only unprocessed messages; mark-read +
   archive ensures a message never reappears. No deduplication state is
   needed.

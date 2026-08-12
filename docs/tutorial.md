@@ -3,31 +3,27 @@
 This page tells the build story of `yoker-assistant` end-to-end. A reader who
 finishes it understands why the package exists, what the two halves are, how
 the seams between them work, what the agent is allowed to do, how the session
-stays alive across emails, and how the package doubles as a reusable yoker
-plugin. It is a narrative — not a reference, not a list of links. The
-functional spec (`analysis/functional.md` in the repo) is the source of truth
-for the design; this page tells the story of how that design was realised.
+stays alive across emails, and how the package doubles as a reusable Yoker
+plugin. It is a narrative — not a reference, not a list of links.
 
-The package is small on purpose. It is one of two yoker 1.0 pet-store
-showcases; its job is to demonstrate yoker-as-SDK — Python owns the loop and
-imports yoker as a library for the reasoning half. Every decision below is in
+The package is small on purpose. It is one of two Yoker 1.0 showcase
+packages; its job is to demonstrate yoker-as-SDK — Python owns the loop and
+imports Yoker as a library for the reasoning half. Every decision below is in
 service of that demonstration.
 
 ---
 
 ## 1. Why this exists
 
-The heritage assistant lives in `../c3/agents/assistant.md` and runs inside
-Claude Code. In that model, the **agent** does the cheap recurring structured
-work of polling an email inbox via an MCP email server
-(`mcp__plugin_c3_email__*` tools). The agent wakes on a `/loop 30m /pa-email`
-schedule, lists `UNSEEN`, fetches each message, categorizes, takes actions,
-composes a reply, sends it, marks the original read, archives it, and sleeps
-until the next tick. All of that is structured work — IMAP and SMTP plumbing,
-flag bookkeeping, archive moves — and none of it needs a language model. It
-needs a loop and a mailbox client. Paying per-token agent cost to drive IMAP
-search is the pattern this project eliminates.
-
+The starting point is a personal assistant agent that communicates by email.
+In a traditional agent-owns-everything model, the **agent** does all the
+work: it polls an email inbox via email server tools, lists `UNSEEN`,
+fetches each message, categorizes, takes actions, composes a reply, sends
+it, marks the original read, archives it, and sleeps until the next tick.
+All of that is structured work — IMAP and SMTP plumbing, flag bookkeeping,
+archive moves — and none of it needs a language model. It needs a loop and
+a mailbox client. Paying per-token agent cost to drive IMAP search is the
+pattern this project eliminates.
 The insight is that the email loop is cheap structured work that should live
 in Python, not in the agent. Python polls the mailbox, fetches messages,
 sends replies, and archives originals. The agent is left to do what it is
@@ -35,20 +31,21 @@ good at — reasoning about the email content, deciding what to do, using
 bounded tools to do it, and composing the reply. No agent cost is spent on
 structured work; no Python is spent on reasoning.
 
-The port therefore does two things. **First, it moves the email loop into
-Python.** Python polls the mailbox via the `simple-email-gw` package, parses
-messages, and sends replies. The MCP email-server tools and the inbox-checking
-logic are removed from the agent. **Second, it wraps the slimmed agent in a
-Python loop that calls yoker as an SDK.** When Python detects an email, it
-hands the content to the agent via yoker's `Agent.process()`. The agent
-reasons and replies; Python sends the reply via `simple-email-gw`.
+The project therefore does two things. **First, it moves the email loop
+into Python.** Python polls the mailbox via the `simple-email-gw` package,
+parses messages, and sends replies. The email-server tools and the
+inbox-checking logic are removed from the agent. **Second, it wraps the
+slimmed agent in a Python loop that calls Yoker as an SDK.** When Python
+detects an email, it hands the content to the agent via Yoker's
+`Agent.process()`. The agent reasons and replies; Python sends the reply
+via `simple-email-gw`.
 
 The result is a standalone Python package that runs unattended on the host it
 is started on. The owner emails it; it reasons about the email, acts on the
 owner's behalf using a curated set of safe tools, and emails back. The inbox
 is the entire UI: no TUI, no CLI prompts, no web. This is the smallest
 interesting demonstration of yoker-as-SDK — and the foundation for the
-dual-mode story (§9) that makes the package reusable by any external yoker
+dual-mode story (§9) that makes the package reusable by any external Yoker
 consumer.
 
 ## 2. The two halves
@@ -258,7 +255,7 @@ retry. Mark read immediately after a successful send, before archiving, so
 the message is excluded from `UNSEEN` even if the archive move fails — a
 marked-read-but-not-archived message lingers in INBOX until the next loop
 tidies it, but it is not reprocessed (no duplicate reply). Idempotency
-relies on IMAP flags, exactly as the heritage `pa-email` skill did: `UNSEEN`
+relies on IMAP flags: `UNSEEN`
 search returns only unprocessed messages; mark-read + archive ensures a
 message never reappears. No deduplication state is needed.
 
@@ -288,14 +285,13 @@ demonstrates.
 | `pkgq:find` | Package documentation lookup (via the pkgq plugin) |
 | `yoker_assistant:md_to_html` | Convert markdown reply to HTML (this package's own tool — §8) |
 
-The safety model is the point. The heritage c3 assistant had `Bash` — an
-open shell. yoker's safety model is the opposite: agents get a curated set of
-safe, named tools, never an open shell. Each tool has guardrails (path
-restrictions, URL validation, complexity limits); the agent cannot escape
-them because the tool itself enforces them, not a prompt. `Bash` is removed;
-`AskUserQuestion` and `PushNotification` (Claude Code UI concepts) are
-removed; the MCP email tools are removed (the email loop moved to Python);
-the MCP resource tools are removed. What is left is a small, auditable
+The safety model is the point. The agent gets a curated set of safe,
+named tools, never an open shell. Each tool has guardrails (path
+restrictions, URL validation, complexity limits); the agent cannot
+escape them because the tool itself enforces them, not a prompt. There
+is no `Bash`, no interactive UI prompt tool, no direct email server
+access — those responsibilities either moved to Python (email) or were
+eliminated (shell, UI prompts). What is left is a small, auditable
 surface that the agent uses to act on the owner's behalf.
 
 `yoker:git` is full git — read, commit, push — not a read-only view. This is
@@ -305,48 +301,51 @@ shell (§10). The blast radius is real (the agent can push to the configured
 remote) and is bounded by the trust gate (§9) and by the recipient whitelist
 (§11).
 
-## 6. The c3 → yoker-assistant porting map
+## 6. Design decisions — what was kept, reworked, and dropped
 
-The adaptation principle, stated once: keep the concepts — what an agent is,
-what a skill is — and rework the mechanics for the yoker context. c3 runs
-inside Claude Code with its own orchestrator; yoker is an SDK/runtime with
-different mechanics. For each adapted piece, what is kept verbatim and what
-is reworked is stated explicitly. The full per-element table is on the
-[Porting Map](porting-map.md) page; the condensed verdicts are here.
+The agent definition was adapted from an existing assistant that ran
+inside a different orchestrator. The adaptation principle: keep the
+concepts — what an agent is, what a skill is — and rework the mechanics
+for the Yoker context. For each piece, what was kept and what was
+reworked is stated explicitly.
 
 **KEPT** — the assistant concept and identity; the agent definition format
-(markdown + YAML frontmatter); the core reasoning workflow (categorize → act
-→ reply); item categorization rules; memory creation; the reply format; the
-curated read/write/web/skill/agent tool set. Reading `PERSONAL.md` at session
-start is kept AS-IS from c3, and so is writing to it (the agent adds learned
-behaviours for later, via `yoker:update`/`yoker:write`).
+(markdown + YAML frontmatter); the core reasoning workflow (categorize →
+act → reply); item categorization rules; memory creation; the reply
+format; the curated read/write/web/skill/agent tool set. Reading
+`PERSONAL.md` at session start is kept as-is, and so is writing to it
+(the agent adds learned behaviours for later, via
+`yoker:update`/`yoker:write`).
 
-**REMOVED** — all MCP email tools (the central reason the project exists);
-the `pa-email` skill; `Bash` (yoker's safety model — no open shell); the
-Claude Code UI tools `AskUserQuestion` and `PushNotification`; the MCP
-resource tools; the file inbox/outbox/archive I/O from `pa-inbox` and
-`pa-outbox`; the `color` frontmatter field (a Claude Code UI hint).
+**REMOVED** — all direct email server tools (the central reason the
+project exists — the email loop moved to Python); the open shell
+(Yoker's safety model — no `Bash`); interactive UI tools
+(`AskUserQuestion`, `PushNotification` — there is no interactive UI, the
+only channel is email); the file-based inbox/outbox/archive I/O (the
+inbox is now an email, not a directory); the `color` frontmatter field
+(a UI hint with no meaning in unattended mode).
 
-**REWORKED** — `Glob` → `yoker:list` (yoker has `list`, not a separate
-`Glob`); `Grep` → `yoker:search`; `Edit` → `yoker:update`; the pkgq tool from
-an MCP server (`mcp__plugin_c3_pkgq__find_package`) to a yoker plugin
-(`pkgq:find`); `pa-inbox` from a file-based inbox processor to a
-reasoning-only skill over the email handoff; `pa-outbox` from a file-based
-outbox writer to a reply-format skill that ends in HTML via `md_to_html`.
+**REWORKED** — file listing tools map to `yoker:list`; content search
+maps to `yoker:search`; file editing maps to `yoker:update`; the
+package-documentation lookup tool loads as a Yoker plugin (`pkgq:find`)
+instead of a server plugin; the inbox-processing skill became
+reasoning-only logic over the email handoff; the reply-formatting skill
+became a reply that ends in HTML via the custom `md_to_html` tool.
 
-**DROPPED** — `pa-session`. The heritage skill maintained `session-state.md`
-for continuity across iterations. yoker's persistent context manager
-(§7) carries session state natively across `process()` calls — the agent
-remembers the running conversation across emails without an external state
-file. On top of that, the agent writes memory files and `PERSONAL.md` learned
-behaviours. There is no job left for `pa-session`; keeping it would be dead
-surface area. Dropped and documented.
+**DROPPED** — session-state management. The earlier approach maintained
+a `session-state.md` file for continuity across iterations. Yoker's
+persistent context manager (§7) carries session state natively across
+`process()` calls — the agent remembers the running conversation across
+emails without an external state file. On top of that, the agent writes
+memory files and `PERSONAL.md` learned behaviours. There is no job left
+for a separate session-state mechanism; keeping it would be dead surface
+area. Dropped and documented.
 
-**ADDED** — `yoker_assistant:md_to_html`. A custom local tool defined in THIS
-package as a yoker plugin (§8). This is the showcase's "create your own
-bounded tool" example and pairs with the built-in curated tools above to
-demonstrate both halves of yoker's tool model: using built-ins AND authoring
-your own.
+**ADDED** — `yoker_assistant:md_to_html`. A custom local tool defined in
+THIS package as a Yoker plugin (§8). This is the showcase's "create your
+own bounded tool" example and pairs with the built-in curated tools
+above to demonstrate both halves of Yoker's tool model: using built-ins
+AND authoring your own.
 
 ## 7. The persistent-session architecture
 
@@ -381,8 +380,8 @@ emails — continuity lives in the persistent session (yoker's context
 manager), plus memory files the agent writes via `yoker:write`, plus
 `PERSONAL.md` learned behaviours the agent writes via `yoker:update`. The
 session is not re-initialized per email; the `Initialize` turn is not
-repeated. This is why `pa-session` was dropped (§6): the context manager
-already carries the state `pa-session` used to maintain in a file.
+repeated. This is why the session-state mechanism was dropped (§6): the
+context manager already carries the state it used to maintain in a file.
 
 Context-window growth (compaction, summarization, trimming) is yoker's
 responsibility, not this package's. The package uses yoker's persistent
@@ -603,8 +602,8 @@ tracked in `TODO.md` under "Unsorted":
   first pass is `md_to_html` (the showcase's "create your own bounded tool"
   example). All other new bounded tools remain Phase B.
 
-The first pass satisfies the project's stated scope: port the agent +
-skills, remove MCP email logic, wrap in the Python email loop, demonstrate
+The first pass satisfies the project's stated scope: build the agent,
+move the email logic to Python, wrap in the Python email loop, demonstrate
 yoker-as-SDK with a curated tool set, and demonstrate BOTH halves of
 yoker's tool model — using built-in curated tools AND authoring a custom
 local tool (the `md_to_html` converter). What is out of scope is documented
@@ -614,7 +613,7 @@ here and in `TODO.md`; everything else is in.
 
 This is the end of the narrative. The supporting pages hold the long-form
 reference: [Architecture](architecture.md) for the seam-by-seam detail,
-[Porting Map](porting-map.md) for the full per-element table,
+[Design Decisions](design-decisions.md) for the full per-element table,
 [Security](security.md) for the security configuration and the manifest
 review process, [Configuration](configuration.md) for the full `~/.yoker.toml`
 and `.env` reference, and [API](api.md) for the public API surface.

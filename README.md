@@ -2,29 +2,76 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)][python]
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)][uv]
-[![CI](https://img.shields.io/github/actions/workflow/status/christophevg/yoker-assistant/ci.yml.svg)][ci]
+[![Yoker](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/christophevg/yoker/master/media/badge/v0.json)][yoker]
+[![Docs](https://img.shields.io/readthedocs/yoker-assistant)][docs]
 [![License](https://img.shields.io/github/license/christophevg/yoker-assistant.svg)][license]
-[![Agentic](https://img.shields.io/badge/workflow-agentic-blueviolet?style=flat-square)](https://christophe.vg/about/Agentic-Workflow)
+[![Agentic](https://img.shields.io/badge/workflow-agentic-blueviolet?style=flat-square)][agentic]
 
 > A personal assistant that communicates by email, built on yoker-as-SDK.
 
-This is a yoker 1.0 pet-store showcase package. Python owns the email loop
-(poll, fetch, reply, archive) and calls yoker as a library for the reasoning
-half. The package is also a yoker plugin provider (dual-mode): it exposes its
-own tools via `__YOKER_MANIFEST__` for any yoker consumer to load.
+This is a Yoker showcase package. It demonstrates the **yoker-as-SDK**
+mode: Python owns the process and calls Yoker as a library for the
+reasoning half. The package is also a Yoker plugin provider (dual-mode):
+it exposes its own tools via `__YOKER_MANIFEST__` for any Yoker consumer
+to load.
+
+**Full documentation** is published at
+**[yoker-assistant.readthedocs.io](https://yoker-assistant.readthedocs.io)** —
+including a [tutorial](https://yoker-assistant.readthedocs.io/en/latest/tutorial.html)
+that tells the build story end-to-end, a [quickstart](https://yoker-assistant.readthedocs.io/en/latest/quickstart.html)
+with a worked example, and a per-page [reference](https://yoker-assistant.readthedocs.io/en/latest/architecture.html)
+for architecture, security, and configuration.
 
 ## Status
 
-First pass implemented (P1–P3). The loop, the agent seam, the mailbox seam,
-the bounded tool set, the tests, and `SECURITY.md` have landed. See
+Initial release candidate. The loop, the agent seam, the mailbox seam,
+the bounded tool set, the custom md→html tool, the tests, and
+`SECURITY.md` are all in place. All quality gates green. See
 [`TODO.md`](TODO.md) for the remaining backlog (HTML styling polish,
-attachment handling, batch processing, `make run-demo`, Phase B bounded
-tools).
+attachment handling, batch processing, `make run-demo`).
 
-## Quick start
+## What It Does
+
+The assistant is a **personal assistant that communicates by email**.
+You email it; it reasons about the email, acts on your behalf using a
+curated set of safe tools, and emails back. The inbox is the entire UI —
+no TUI, no CLI prompts, no web.
+
+### How it works
+
+1. **Python owns the email loop.** It polls an IMAP inbox for `UNSEEN`
+   messages, fetches each one, and hands it to the agent as a simple
+   From/Subject/Date/body payload.
+2. **The agent reasons.** It categorizes the email, decides what actions
+   to take, uses its bounded tools (read, write, web search, git, etc.),
+   and composes a reply in markdown.
+3. **The agent converts the reply to HTML** via a custom `md_to_html`
+   tool (the showcase's "create your own bounded tool" example).
+4. **Python sends the reply.** It emails the HTML verbatim, marks the
+   original read, and archives it.
+
+### The bootstrap flow
+
+On first run, `PERSONAL.md` does not exist. The agent detects this and
+replies with a welcome message and questions about you (name, preferred
+address, project context, tone, goals). You answer by replying over
+email. The agent iterates with you until it has enough to write the
+initial `PERSONAL.md` — and optionally commits and pushes it via
+`yoker:git`. After bootstrap, every subsequent email is the next message
+in the same session.
+
+### The git demo beat
+
+The visible "acts on behalf of the owner" moment: the agent
+autonomously maintains its own `PERSONAL.md` learned-behaviours file in
+version control. When you email a preference ("from now on, always CC me
+on deploy-related replies"), the agent updates `PERSONAL.md`, commits,
+and pushes — all via bounded git tools, not a shell.
+
+## Quick Start
 
 ```bash
-make env-dev                              # install all dependencies (PyPI)
+make env-dev                              # install all dependencies
 make test                                 # run the test suite
 python -m yoker_assistant --once          # one poll iteration, then exit
 ```
@@ -32,128 +79,56 @@ python -m yoker_assistant --once          # one poll iteration, then exit
 `--once` is the demo/test mode: one poll iteration and exit. Drop `--once`
 for the long-running mode (polls every 60 seconds until `SIGINT`/`SIGTERM`).
 
-A yoker backend is a prerequisite — either a local
+A Yoker backend is a prerequisite — either a local
 [Ollama](https://ollama.com) install or a cloud LLM provider API key. If
 you do not already have one, run `uv run yoker init` once to write
 `~/.yoker.toml` with a backend of your choice.
 
-## Configuration
+See [Installation](https://yoker-assistant.readthedocs.io/en/latest/installation.html)
+for the full setup guide, including email account configuration and plugin
+registration.
 
-Two config files are required at runtime; **neither is committed** (`.env`
-is gitignored; `~/.yoker.toml` lives in the user home and never enters the
-repo). Reference templates live in this repo.
+## Architecture
 
-### `~/.yoker.toml` — yoker runtime + plugin registration
+This package demonstrates **yoker-as-SDK**: Python owns the email loop
+(poll, fetch, reply, archive) and calls Yoker as a library for the
+reasoning half. The package is also a Yoker plugin provider (dual-mode):
+it exposes its own `md_to_html` tool via `__YOKER_MANIFEST__` for any
+Yoker consumer to load — including itself.
 
-The required lines (see [`yoker.toml.example`](yoker.toml.example) for the
-full reference):
+The sister project
+[`yoker-writing-assistant`](https://github.com/christophevg/yoker-writing-assistant)
+demonstrates the complementary mode — **yoker-as-runtime** — where Yoker
+is the entry point and the package runs under it as a plugin.
 
-```toml
-[plugins]
-enabled = true
-packages = ["yoker_assistant", "pkgq"]
-
-[plugins.trusted]
-yoker_assistant = true
-pkgq = true
-
-[skills]
-directories = ["./skills"]
-```
-
-Self-trust (`[plugins.trusted] yoker_assistant = true; pkgq = true`) is
-**required** for unattended operation: with no TTY to prompt, yoker's trust
-gate rejects untrusted plugins in non-interactive mode. Backend and model
-settings (provider, `base_url`, `api_key`, `model`) also live in
-`~/.yoker.toml`; `yoker.toml.example` shows a local Ollama shape (no key)
-and a cloud shape (API key). See the [Configuration page](https://yoker-assistant.readthedocs.io/en/latest/configuration.html)
-for the full reference.
-
-### `.env` — email account (simple-email-gw)
-
-Copy [`.env.example`](.env.example) to `.env` and fill in the mailbox
-credentials the assistant polls:
-
-```
-EMAIL_IMAP_HOST=imap.example.com
-EMAIL_SMTP_HOST=smtp.example.com
-EMAIL_USERNAME=assistant@example.com
-EMAIL_PASSWORD=your-app-password-here
-EMAIL_RECIPIENT_WHITELIST_ADDRESSES=owner@example.com
-```
-
-`EMAIL_RECIPIENT_WHITELIST_ADDRESSES` is the **primary reply-safety
-boundary**: the assistant may only reply to addresses in this whitelist.
-Set it to the single owner address; leaving it broad allows the agent to
-reply to arbitrary senders. This is a `simple-email-gw` config concern, not
-package code. The env var name is `EMAIL_RECIPIENT_WHITELIST_ADDRESSES`
-(NOT `EMAIL_RECIPIENT_ADDRESSES`); the wrong name silently disables the
-whitelist. See [Security configuration](#security-configuration) below.
-
-## Security configuration
-
-Marking `[plugins.trusted] yoker_assistant = true` admits ALL tool code
-from this package as trusted with no per-call gate — pin the installed
-version (`uv pip install yoker-assistant==<version>`) and verify the
-source. The blast radius includes `yoker:git` (full git — read, commit,
-push). Adding a new tool to `__YOKER_MANIFEST__`, or making a
-capability-changing edit to an existing tool, is a security-relevant
-change; see [`SECURITY.md`](SECURITY.md) for the review process
-contributors must follow before such a change.
-
-`EMAIL_RECIPIENT_WHITELIST_ADDRESSES` is the primary reply-safety boundary
-(see [.env](#env--email-account-simple-email-gw) above). `~/.yoker.toml`
-and `.env` are NEVER committed — `.env` is gitignored; a user who
-snapshots `~/.yoker.toml` into a repo must gitignore it too.
-[`make pre-publish`](Makefile) guards against local-path dependencies
-leaking into published metadata. See the [Security page](https://yoker-assistant.readthedocs.io/en/latest/security.html)
-for the full discussion.
-
-## Running it
-
-```bash
-python -m yoker_assistant              # long-running loop
-python -m yoker_assistant --once        # one iteration, then exit (demo/test)
-```
-
-The long-running mode polls every 60 seconds. `SIGINT` (Ctrl-C) and
-`SIGTERM` both trigger a clean exit: the in-flight message finishes, the
-IMAP connection disconnects, and the process exits 0. There is no forced
-kill mid-iteration.
-
-The first time the assistant runs, `PERSONAL.md` does not exist in the
-working directory. The agent detects this on its `Initialize` turn and
-enters a bootstrap flow: it replies with a welcome message and a set of
-questions about you (name, preferred address, project context, tone,
-goals); you answer by replying over email; the agent iterates with you
-until it has enough to write the initial `PERSONAL.md` (and optionally
-commits + pushes it via `yoker:git`). After bootstrap, every subsequent
-email is the next user message in the SAME session.
+Both projects share a common quality bar documented in
+[STANDARDS.md](STANDARDS.md).
 
 ## Documentation
 
 Full documentation lives in `docs/` and is published to ReadTheDocs:
 
-**https://yoker-assistant.readthedocs.io/**
+**https://yoker-assistant.readthedocs.io**
 
 The [Tutorial](https://yoker-assistant.readthedocs.io/en/latest/tutorial.html)
-tells the build story end-to-end — why this package exists (c3 heritage,
-the email-loop-into-Python insight), the two halves (Python loop vs agent
-reasoning), the seams (yoker SDK seam + simple-email-gw seam), the handoff
-contract (payload format + four-way branch), the bounded tool set and the
-safety model, the c3 → yoker-assistant porting map, the persistent-session
+tells the build story end-to-end — why this package exists, the two halves
+(Python loop vs agent reasoning), the seams (Yoker SDK seam +
+simple-email-gw seam), the handoff contract (payload format + four-way
+branch), the bounded tool set and the safety model, the persistent-session
 architecture, the custom md→html tool story, the dual-mode architecture,
-the git commit/push demo beat, recipient safety, and what is out of scope
-for the first pass.
+the git commit/push demo beat, recipient safety, and what is out of scope.
 
 Supporting pages: [Installation](https://yoker-assistant.readthedocs.io/en/latest/installation.html),
 [Quickstart](https://yoker-assistant.readthedocs.io/en/latest/quickstart.html),
 [Architecture](https://yoker-assistant.readthedocs.io/en/latest/architecture.html),
-[Porting Map](https://yoker-assistant.readthedocs.io/en/latest/porting-map.html),
 [Security](https://yoker-assistant.readthedocs.io/en/latest/security.html),
 [Configuration](https://yoker-assistant.readthedocs.io/en/latest/configuration.html),
 [API](https://yoker-assistant.readthedocs.io/en/latest/api.html),
 [Changelog](https://yoker-assistant.readthedocs.io/en/latest/changelog.html).
+
+The [AGENTS.md](AGENTS.md) file provides the project guide for agents
+working on this codebase. [PACKAGE.md](PACKAGE.md) provides AI-optimized
+package documentation for consumers.
 
 ## License
 
@@ -161,5 +136,7 @@ Supporting pages: [Installation](https://yoker-assistant.readthedocs.io/en/lates
 
 [python]: https://python.org/
 [uv]: https://docs.astral.sh/uv/
-[ci]: https://github.com/christophevg/yoker-assistant/actions
+[yoker]: https://yoker.dev
+[docs]: https://yoker-assistant.readthedocs.io
 [license]: https://github.com/christophevg/yoker-assistant/blob/master/LICENSE
+[agentic]: https://christophe.vg/about/Agentic-Workflow

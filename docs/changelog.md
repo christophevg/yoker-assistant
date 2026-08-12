@@ -10,19 +10,23 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 - `docs/` folder with Sphinx + MyST + `sphinx_rtd_theme` configuration for
   ReadTheDocs (P4-001).
 - `docs/tutorial.md` — the full build-story narrative (12 sections).
-- `docs/architecture.md`, `docs/porting-map.md`, `docs/security.md`,
-  `docs/configuration.md`, `docs/api.md`, `docs/installation.md`,
-  `docs/quickstart.md`, `docs/changelog.md`, `docs/index.md`.
+- `docs/architecture.md`, `docs/security.md`, `docs/configuration.md`,
+  `docs/api.md`, `docs/installation.md`, `docs/quickstart.md`,
+  `docs/changelog.md`, `docs/index.md`.
 - `.readthedocs.yaml` ReadTheDocs build configuration.
-- README rewritten as the lean front-door (per `c3:readme`) with a
-  Documentation section linking the full docs on ReadTheDocs.
+- `LICENSE` file (MIT).
+- `.env.example` reference template for email account configuration.
+- `AGENTS.md` — project guide for code agents working on this codebase.
+- `PACKAGE.md` — AI-optimized package documentation for consumers.
+- README rewritten as the lean front-door with a Documentation section
+  linking the full docs on ReadTheDocs.
 
 ## [0.1.0] — 2026-07-23
 
 ### Added
 - **P1-001** — uv Python project skeleton (`pyproject.toml`, `src/`
   layout, console script `yoker-assistant`, standard Makefile targets).
-- **P1-002** — runtime dependencies (`yoker>=0.8.0`, `simple-email-gw>=0.3.0`,
+- **P1-002** — runtime dependencies (`yoker>=0.10.1`, `simple-email-gw>=0.3.0`,
   `pkgq>=0.3.2`); local-path dev-wiring via `[tool.uv.sources]`;
   `yoker.toml.example` and `.env.example` reference templates.
 - **P1-003** — errata fixes: renamed `EMAIL_RECIPIENT_ADDRESSES` →
