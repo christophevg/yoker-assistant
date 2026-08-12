@@ -5,6 +5,17 @@ format is based on [Keep a Changelog](https://keepachangelog.com/), and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+## [0.1.2] — 2025-07-18
+
+### Added
+- First-run bootstrap wizard: when no yoker configuration is found, the
+  interactive bootstrap wizard runs so the user can configure a provider
+  and model. The wizard writes `~/.yoker.toml` with `enabled = false` —
+  the user must then set `enabled = true` and re-run. Non-interactive
+  mode aborts with a message pointing to the docs. This matches the
+  bootstrap flow in yoker-writing-assistant.
+
 ## [0.1.1] — 2025-07-18
 
 ### Changed
@@ -100,6 +111,7 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   reinvent the markdown-to-HTML converter; vendored the existing logic
   with an HTML-escaping fix.
 
-[Unreleased]: https://github.com/christophevg/yoker-assistant/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/christophevg/yoker-assistant/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/christophevg/yoker-assistant/releases/tag/v0.1.2
 [0.1.1]: https://github.com/christophevg/yoker-assistant/releases/tag/v0.1.1
 [0.1.0]: https://github.com/christophevg/yoker-assistant/releases/tag/v0.1.0
