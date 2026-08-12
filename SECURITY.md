@@ -11,10 +11,12 @@ released unless we agree otherwise.
 
 yoker-assistant is a yoker plugin provider. Its `__YOKER_MANIFEST__`
 (in `src/yoker_assistant/__init__.py`) declares the tools this package
-exposes. When a user installs yoker-assistant and marks
-`[plugins.trusted] yoker_assistant = true` in `~/.yoker.toml`, every tool
-in the manifest runs with **no per-call gate** — the trust decision is
-made once, at install time, and admits all tool code from the package.
+exposes. When a user installs yoker-assistant and runs the email loop,
+the package self-trusts programmatically in `loop.py` — injecting
+`config.plugins.trusted["yoker_assistant"] = True` and
+`config.plugins.trusted["pkgq"] = True` at startup. This means every
+tool in the manifest runs with **no per-call gate** — the trust decision
+is made once, at install time, and admits all tool code from the package.
 
 This is the intended yoker trust model, but it means adding a new tool
 to `__YOKER_MANIFEST__` — or making a capability-changing edit to an

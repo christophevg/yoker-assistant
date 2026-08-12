@@ -85,8 +85,8 @@ you do not already have one, run `uv run yoker init` once to write
 `~/.yoker.toml` with a backend of your choice.
 
 See [Installation](https://yoker-assistant.readthedocs.io/en/latest/installation.html)
-for the full setup guide, including email account configuration and plugin
-registration.
+for the full setup guide, including email account configuration. Plugin
+registration is automatic — the package self-injects it at startup.
 
 ## Architecture
 

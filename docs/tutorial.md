@@ -443,11 +443,13 @@ The package is simultaneously three layers of yoker's tool model:
    frontmatter and yoker resolves them at session startup.
 2. **Provider** of its own named safe tool — `yoker_assistant:md_to_html`.
    The tool is defined in this package, exposed via `__YOKER_MANIFEST__`,
-   and registered via the user's `~/.yoker.toml [plugins]` block (NOT
-   programmatic — no `plugins=()` arg to `Agent`).
+   and registered automatically: the package injects
+   `config.plugins.enabled = True`, adds itself and `pkgq` to
+   `config.plugins.packages`, and self-trusts both in `loop.py` at
+   startup. No user-side `[plugins]` config is needed for the email loop.
 3. **Reusable plugin** — any external yoker consumer can load the tool
-   identically. `pip install yoker-assistant` plus the same two lines in
-   their `~/.yoker.toml`:
+   identically. `pip install yoker-assistant` plus manual `[plugins]` /
+   `[plugins.trusted]` lines in their `~/.yoker.toml`:
    ```toml
    [plugins]
    enabled = true
@@ -456,36 +458,41 @@ The package is simultaneously three layers of yoker's tool model:
    [plugins.trusted]
    yoker_assistant = true
    ```
-   Self-consumption and third-party consumption use the identical mechanism.
-   This is the elegant showcase point: there is no "internal" API and
-   "external" API — there is one plugin API, and the package uses it on
-   itself the same way a stranger would.
+   The email loop self-injects its plugin config; external consumers
+   add it manually. Both use the identical plugin mechanism — this is
+   the elegant showcase point: there is no "internal" API and "external"
+   API — there is one plugin API, and the package uses it on itself
+   (with automatic injection) the same way a stranger would use it (with
+   manual config).
 
 ### The self-trust requirement
 
-With no TTY to prompt, yoker's trust gate rejects untrusted plugins in
-non-interactive mode. The package runs unattended (the loop has no UI), so
-the user must mark the package trusted in `~/.yoker.toml`:
+The package runs unattended (the loop has no UI, no TTY to prompt), so
+yoker's trust gate would reject untrusted plugins in non-interactive
+mode. Instead of requiring the user to add `[plugins.trusted]` lines to
+`~/.yoker.toml`, the package self-trusts programmatically in `loop.py`:
 
-```toml
-[plugins.trusted]
-yoker_assistant = true
-pkgq = true
+```python
+config.plugins.enabled = True
+for pkg in ("yoker_assistant", "pkgq"):
+    if pkg not in config.plugins.packages:
+        config.plugins.packages = (*config.plugins.packages, pkg)
+    config.plugins.trusted[pkg] = True
 ```
 
-The blast radius: marking `[plugins.trusted] yoker_assistant = true` admits
-ALL tool code from this package as trusted with no per-call gate. The trust
-decision is made once, at install time. Pin the installed version
+This is the programmatic equivalent of the `--plugins-enabled` CLI flag
+used by yoker-writing-assistant. The self-trust admits ALL tool code
+from this package (and `pkgq`) as trusted with no per-call gate. The
+trust decision is made once, at install time. Pin the installed version
 (`uv pip install yoker-assistant==<version>`) and verify the source. Adding
 a new tool to `__YOKER_MANIFEST__`, or making a capability-changing edit to
 an existing tool, is a security-relevant change; see [Security](security.md)
 for the review process contributors must follow before such a change.
 
-Self-trust is a single line in `~/.yoker.toml`. It is what makes unattended
-operation possible; it is also what makes the blast radius real. Both are
-the intended yoker trust model — the user takes the trust decision at
-install time, once, and the package's tools then run without per-call
-interruption.
+Self-trust is what makes unattended operation possible; it is also what
+makes the blast radius real. Both are the intended yoker trust model —
+the user takes the trust decision at install time, once, and the
+package's tools then run without per-call interruption.
 
 ### Why the three layers matter together
 

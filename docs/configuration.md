@@ -32,35 +32,21 @@ The `.env` file is gitignored at the repo root. Copy `.env.example` to
 ## yoker runtime — `~/.yoker.toml`
 
 The backend, model, and permissions live in the user's `~/.yoker.toml`,
-created by yoker's bootstrap wizard (`uv run yoker init`). The
-`[plugins]` / `[plugins.trusted]` lines also live there — that is the
-correct location for plugin registration because yoker resolves project
-config from `~/.yoker.toml` (user) and `./yoker.toml` (cwd), NOT from the
-package install location. A repo-level `yoker.toml` is only read during
-local dev (when the cwd is the checkout) and would clobber the user's
-backend config there. The package provides a `yoker.toml.example` as
-documentation only — reference for the lines the user must add to their
-`~/.yoker.toml`, not a checked-in active config.
+created by yoker's bootstrap wizard (`uv run yoker init`). Plugin
+registration is **not** required there: the package injects
+`plugins.enabled = True`, adds itself and `pkgq` to `plugins.packages`,
+and self-trusts both at startup (in `loop.py`). This is the programmatic
+equivalent of the `--plugins-enabled` CLI flag used by
+yoker-writing-assistant — the package self-trusts because it runs
+unattended (no TTY), and yoker's interactive trust prompt cannot fire.
+See [Security](security.md) for the blast-radius implication and
+version-pinning advice.
 
-### Required lines in `~/.yoker.toml`
-
-```toml
-[plugins]
-enabled = true
-packages = ["yoker_assistant", "pkgq"]
-
-[plugins.trusted]
-yoker_assistant = true
-pkgq = true
-
-[skills]
-directories = ["./skills"]
-```
-
-The `[plugins.trusted]` block is required for unattended operation: with
-no TTY to prompt, yoker's trust gate rejects untrusted plugins in
-non-interactive mode. See [Security](security.md) for the blast-radius
-implication and the version-pinning advice.
+The package provides a `yoker.toml.example` as documentation only —
+reference for the backend config shape the user needs in their
+`~/.yoker.toml`, not a checked-in active config. A repo-level
+`yoker.toml` is only read during local dev (when the cwd is the
+checkout) and would clobber the user's backend config there.
 
 ### Backend and model
 

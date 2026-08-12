@@ -33,32 +33,28 @@ The `yoker.toml.example` in this repo shows a local Ollama shape (no API key
 required) and a cloud shape (API key). Either works; pick one and put it in
 `~/.yoker.toml`, not in the repo.
 
-## Plugin registration (`~/.yoker.toml`)
+## Plugin registration — automatic
 
-yoker-assistant is a yoker plugin provider. yoker resolves project config from
-`~/.yoker.toml` (user) and `./yoker.toml` (cwd) — NOT from the package install
-location. Plugin registration belongs in `~/.yoker.toml`; a repo-level
-`yoker.toml` would only be read during local dev and would clobber your
-backend/model config. Add these lines to `~/.yoker.toml` (see
-`yoker.toml.example` for the full reference):
+yoker-assistant is a yoker plugin provider, but you do **not** need to add
+plugin registration to your `~/.yoker.toml`. The package injects plugin
+configuration programmatically at startup (in `loop.py`):
 
-```toml
-[plugins]
-enabled = true
-packages = ["yoker_assistant", "pkgq"]
+- `plugins.enabled = True`
+- `yoker_assistant` and `pkgq` added to `plugins.packages`
+- Both marked trusted via `plugins.trusted`
 
-[plugins.trusted]
-yoker_assistant = true
-pkgq = true
+This is the programmatic equivalent of the `--plugins-enabled` CLI flag used
+by yoker-writing-assistant. The package self-trusts because it runs unattended
+(no TTY) — yoker's interactive trust prompt cannot fire, so without self-trust
+the plugin would be rejected in non-interactive mode. See
+[Security](security.md) for the blast-radius implication and version-pinning
+advice.
 
-[skills]
-directories = ["./skills"]
-```
-
-The `[plugins.trusted]` block is **required** for unattended operation: with
-no TTY to prompt, yoker's trust gate rejects untrusted plugins in
-non-interactive mode. See the [Security page](security.md) for the blast-radius
-implication and the version-pinning advice.
+> **External consumers:** if you want to use `yoker_assistant:md_to_html` as
+> a plugin in your own yoker project (not running the email loop), you still
+> need manual plugin registration. See [PACKAGE.md](../PACKAGE.md) for those
+> lines. The automatic injection only applies when running yoker-assistant's
+> own email loop.
 
 ## Email account (`.env`)
 

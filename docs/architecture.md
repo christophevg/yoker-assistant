@@ -276,24 +276,31 @@ dual-mode.
   `agents/*.md` inside the installed `yoker_assistant` package — so
   external yoker consumers can reference the assistant agent by name
   (`yoker_assistant:assistant`) from their `Session`'s registry.
-- The user adds the plugin registration to their `~/.yoker.toml`:
-  `[plugins] enabled = true; packages = ["yoker_assistant", "pkgq"]` and
-  `[plugins.trusted] yoker_assistant = true; pkgq = true`.
+- The package injects plugin configuration programmatically at startup
+  (in `loop.py`): `config.plugins.enabled = True`, adds
+  `yoker_assistant` and `pkgq` to `config.plugins.packages`, and marks
+  both trusted. This is the programmatic equivalent of the
+  `--plugins-enabled` CLI flag used by yoker-writing-assistant. The
+  package self-trusts because it runs unattended (no TTY) — yoker's
+  interactive trust prompt cannot fire.
 - The `Agent` is resolved by name (`yoker_assistant:assistant`) from the
   `Session`'s `AgentRegistry`, which the plugin loader populates from the
   installed package's `agents/` directory. No manual definition loader,
   no relative filesystem path that would break when the package is
   installed.
-- External consumers load yoker-assistant's tools the IDENTICAL way:
-  `pip install yoker-assistant` plus the same `[plugins]` /
-  `[plugins.trusted]` lines in their `~/.yoker.toml`. Self-consumption and
-  third-party consumption use the same mechanism — this is the elegant
+- External consumers who want to use `yoker_assistant:md_to_html` as a
+  plugin in their own yoker project still need manual plugin registration
+  in their `~/.yoker.toml` (`[plugins]` / `[plugins.trusted]` lines).
+  Self-consumption (the email loop) and third-party consumption use the
+  same plugin mechanism, but the email loop self-injects the config so
+  the user does not need to add it manually — this is the elegant
   showcase point.
 
 This adds a THIRD layer to the demo: (1) consumer of yoker's built-in
 curated tools, (2) provider of its own named safe tool, (3) reusable —
 any yoker consumer can load the tool. Minimal cost: one manifest
-declaration plus three lines in the user's `~/.yoker.toml`.
+declaration; the email loop self-injects the plugin config so no user
+configuration is needed.
 
 ## The custom md→html tool
 

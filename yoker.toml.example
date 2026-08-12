@@ -1,45 +1,34 @@
 # ============================================================================
 # REFERENCE ONLY — DO NOT USE AS-IS.
 #
-# This file documents the lines you must add to ~/.yoker.toml (your USER
-# config). yoker resolves project config from ~/.yoker.toml (user) and
+# This file documents the backend config you need in ~/.yoker.toml (your
+# USER config). yoker resolves project config from ~/.yoker.toml (user) and
 # ./yoker.toml (cwd), NOT from the package install location. A repo-level
 # ./yoker.toml is only read during local dev (when the cwd is the checkout)
 # and WILL CLOBBER your user backend/model config if you copy this file
 # there. Do NOT copy this file to ./yoker.toml. Do NOT commit a filled-in
-# copy. The correct location for plugin registration is ~/.yoker.toml.
+# copy.
 #
-# Self-trust blast radius: marking [plugins.trusted] yoker_assistant = true
-# (and pkgq = true) admits ALL tool code from those packages as trusted
-# with no per-call gate. Pin the installed versions
-# (`uv pip install yoker-assistant==<version>`) and verify the source.
+# Plugin registration is NOT required in ~/.yoker.toml: the package injects
+# `plugins.enabled = True`, adds itself and `pkgq` to `plugins.packages`,
+# and self-trusts both at startup (in loop.py). This is the programmatic
+# equivalent of the `--plugins-enabled` CLI flag used by
+# yoker-writing-assistant. The package self-trusts because it runs
+# unattended (no TTY) — yoker's interactive trust prompt cannot fire.
+#
+# Self-trust blast radius: the programmatic self-trust admits ALL tool code
+# from this package and pkgq as trusted with no per-call gate. Pin the
+# installed versions (`uv pip install yoker-assistant==<version>`) and
+# verify the source. See docs/security.md for the full discussion.
 # ============================================================================
 
-# -- Plugins (yoker-assistant + pkgq) ----------------------------------------
-# Required for unattended operation: with no TTY to prompt, yoker's trust
-# gate rejects untrusted plugins in non-interactive mode, so both packages
-# must be listed and trusted here.
-
-[plugins]
-enabled = true
-packages = ["yoker_assistant", "pkgq"]
-
-[plugins.trusted]
-yoker_assistant = true
-pkgq = true
-
-# -- Skills ------------------------------------------------------------------
-# Directory holding the ported pa-inbox / pa-outbox SKILL.md files. Relative
-# to the cwd yoker is launched from.
-
-[skills]
-directories = ["./skills"]
-
 # -- Backend / model (placeholder) -------------------------------------------
-# These lines belong in ~/.yoker.toml alongside the [plugins] block above.
-# The example shows a local Ollama backend with no API key (the same shape
-# as the previously-removed repo-level yoker.toml). For a cloud provider,
-# set `api_key` to the secret value — and NEVER commit it.
+# The example shows a local Ollama backend with no API key. For a cloud
+# provider, set `api_key` to the secret value — and NEVER commit it.
+#
+# External consumers who want to use yoker-assistant as a plugin in their
+# own yoker project (not running the email loop) still need manual plugin
+# registration in their ~/.yoker.toml — see PACKAGE.md for those lines.
 
 [backend]
 type = "ollama"

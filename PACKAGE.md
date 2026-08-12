@@ -38,19 +38,29 @@ from yoker_assistant import __YOKER_MANIFEST__
 
 ## Loading as a Yoker Plugin
 
-### Via `~/.yoker.toml`
+### Running the email loop (automatic)
+
+When running yoker-assistant's own email loop, plugin registration is
+automatic: `loop.py` injects `config.plugins.enabled = True`, adds
+`yoker_assistant` and `pkgq` to `config.plugins.packages`, and
+self-trusts both at startup. No `[plugins]` config is needed in
+`~/.yoker.toml`. This is the programmatic equivalent of the
+`--plugins-enabled` CLI flag used by yoker-writing-assistant. The
+package self-trusts because it runs unattended (no TTY) — yoker's
+interactive trust prompt cannot fire.
+
+### Via `~/.yoker.toml` (external consumers)
+
+If you want to use `yoker_assistant:md_to_html` as a plugin in your own
+yoker project (not running the email loop), add manual registration:
 
 ```toml
 [plugins]
 enabled = true
-packages = ["yoker_assistant", "pkgq"]
+packages = ["yoker_assistant"]
 
 [plugins.trusted]
 yoker_assistant = true
-pkgq = true
-
-[skills]
-directories = ["./skills"]
 ```
 
 Self-trust (`[plugins.trusted] yoker_assistant = true`) is **required**
@@ -119,10 +129,13 @@ boundary**. The env var name is `EMAIL_RECIPIENT_WHITELIST_ADDRESSES`
 (NOT `EMAIL_RECIPIENT_ADDRESSES`); the wrong name silently disables
 the whitelist.
 
-### `~/.yoker.toml` — Yoker runtime + plugin registration
+### `~/.yoker.toml` — Yoker runtime
 
-Backend, model, permissions, and plugin registration. Created by
-`uv run yoker init`. See `yoker.toml.example` for the reference shape.
+Backend, model, and permissions. Created by `uv run yoker init`. Plugin
+registration is automatic when running the email loop (the package
+self-injects it in `loop.py`). External consumers need manual
+`[plugins]` config — see "Loading as a Yoker Plugin" above. See
+`yoker.toml.example` for the backend config reference shape.
 
 ### `PERSONAL.md` — assistant personalization
 

@@ -8,12 +8,20 @@ operator-facing configuration.
 
 ## Self-trust blast radius
 
-Marking `[plugins.trusted] yoker_assistant = true` in `~/.yoker.toml`
-admits ALL tool code from this package as trusted with no per-call gate.
-The trust decision is made once, at install time, and admits all tool code
-from the package. This is the intended yoker trust model — the package runs
-unattended (no TTY to prompt), so the trust gate has to be cleared up front
-or the package cannot run.
+The package self-trusts at startup: `loop.py` injects
+`config.plugins.enabled = True`, adds `yoker_assistant` and `pkgq` to
+`config.plugins.packages`, and marks both trusted via
+`config.plugins.trusted[pkg] = True`. This is the programmatic equivalent
+of the `--plugins-enabled` CLI flag used by yoker-writing-assistant. The
+package self-trusts because it runs unattended (no TTY to prompt) —
+yoker's interactive trust gate would reject the plugins in
+non-interactive mode without it.
+
+This admits ALL tool code from this package as trusted with no per-call
+gate. The trust decision is made once, at install time, and admits all
+tool code from the package. This is the intended yoker trust model — the
+package runs unattended, so the trust gate has to be cleared up front or
+the package cannot run.
 
 The blast radius is real: every tool in `__YOKER_MANIFEST__` runs with no
 per-call gate, including `yoker:git` (full git — read, commit, push).
@@ -73,13 +81,13 @@ do not copy real secrets into it.
 ## The manifest-addition review process
 
 Every addition to `__YOKER_MANIFEST__` auto-trusts on user install via
-`[plugins.trusted] yoker_assistant = true` — there is no secondary review
-gate inside the package. `SECURITY.md` documents the review process
-contributors MUST follow before adding a tool to the manifest (or making a
-capability-changing edit to an existing tool — new args, new side effects,
-new dependencies, or a change to the tool's reach). Pure refactors that do
-not change the tool's inputs, outputs, reach, or failure modes do not
-require this review.
+the programmatic self-trust injection in `loop.py` — there is no
+secondary review gate inside the package. `SECURITY.md` documents the
+review process contributors MUST follow before adding a tool to the
+manifest (or making a capability-changing edit to an existing tool —
+new args, new side effects, new dependencies, or a change to the tool's
+reach). Pure refactors that do not change the tool's inputs, outputs,
+reach, or failure modes do not require this review.
 
 The process has four steps (paraphrased here; see `SECURITY.md` for the
 authoritative text):
