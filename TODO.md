@@ -5,55 +5,52 @@
 Everything needed to get the package published and on par with
 yoker-writing-assistant.
 
-### Blocking
+### Done
 
-- [ ] **Fix 4 failing tests** in `tests/test_loop.py`
-  - `test_process_one_logs_conversation_turns` — expects `INFO` log
-    messages (`=== Incoming message (user turn) ===` / `=== Agent reply ===`)
-    that no longer exist after the `RichUIHandler` migration. Either add the
-    log lines back to `_process_one` or update the test to assert UI handler
-    calls instead.
-  - `test_run_proceeds_when_whitelist_enabled`,
-    `test_run_continues_after_process_one_exception`,
-    `test_run_connects_and_disconnects_per_iteration` — all fail with
-    `ValueError: 'MagicMock/mock.agent.definition.source_path/...' and
-    '/Users/...' have different anchors`. The `RichUIHandler.start()` calls
-    `Path.relative_to()` on `agent.definition.source_path`, which is a
-    MagicMock. Fix: patch `RichUIHandler` or set
-    `agent.definition.source_path` to a real `Path` in the test mocks.
+- [x] **Fix 4 failing tests** in `tests/test_loop.py`
+  - Replaced `test_process_one_logs_conversation_turns` with
+    `test_process_one_outputs_handoff_to_ui` (asserts UI handler calls
+    instead of removed log messages).
+  - Patched module-level `ui` in `_mock_session` to a MagicMock with
+    AsyncMock for `start()` — fixes the `Path.relative_to()` crash on
+    MagicMock `source_path`.
 
-- [ ] **Update `yoker` dependency version**
-  - `pyproject.toml` pins `yoker>=0.8.0` but the code uses `Session`,
-    `UIBridge`, `UIHandler`, `get_yoker_config`, and other APIs from newer
-    yoker releases. The sister project (`yoker-writing-assistant`) uses
-    `yoker>=0.10.1`. Update the lower bound to match the actual API
-    surface used.
+- [x] **Update `yoker` dependency version**
+  - `pyproject.toml` updated from `yoker>=0.8.0` to `yoker>=0.10.1`,
+    matching the actual API surface used (`Session`, `UIBridge`,
+    `UIHandler`, `get_yoker_config`).
 
-- [ ] **Remove `agent.py` placeholder stub**
-  - `src/yoker_assistant/agent.py` is a 3-line docstring-only stub left
-    over from P1-001. The agent construction lives in `loop.py` (per the
-    P1-004 descope). Delete the file and remove any references.
+- [x] **Remove `agent.py` placeholder stub**
+  - Deleted `src/yoker_assistant/agent.py` — the agent construction
+    lives in `loop.py` (per the P1-004 descope). No imports referenced it.
 
-- [ ] **Clean up untracked / uncommitted state**
-  - `handler.py` — new file, part of the RichUIHandler work; needs to be
-    committed.
-  - `PERSONAL.md` — runtime-generated, should be `.gitignore`d (not
-    committed).
-  - `context/` — runtime session data, should be `.gitignore`d.
-  - Review all modified files (`Makefile`, `pyproject.toml`,
-    `__main__.py`, `agents/assistant.md`, `loop.py`, `uv.lock`) and
-    commit them.
-  - Remove the `# temporary - comment before publishing!` comment above
-    `[tool.uv.sources]` in `pyproject.toml` (but keep the section — the
-    sister project keeps it too).
+- [x] **Clean up untracked / uncommitted state**
+  - `handler.py` committed (RichUIHandler implementation).
+  - `PERSONAL.md` and `context/` added to `.gitignore` (runtime-generated).
+  - All modified files committed.
+  - Removed `# temporary - comment before publishing!` above
+    `[tool.uv.sources]`.
 
-- [ ] **Verify `make check` and `make pre-publish` pass**
-  - All tests green, lint clean, typecheck clean, build clean, no
+- [x] **Fix typecheck errors in `handler.py`**
+  - `output_stats` signature updated to match `UIHandler` protocol
+    (added `usage_limits` parameter).
+  - Added `output_content` method (was commented out, protocol requires it).
+  - Added type annotation for `str_summary` inner function.
+  - Replaced `Path.relative_to(walk_up=True)` with `os.path.relpath`
+    (Python 3.10 compatibility).
+
+- [x] **Fix hatchling >=1.30 build issue**
+  - Added `core-metadata-version = "2.4"` to both sdist and wheel
+    build targets in `pyproject.toml`.
+
+- [x] **Verify `make check` and `make pre-publish` pass**
+  - 48 tests green, lint clean, typecheck clean, build clean, no
     local-path leakage in built metadata.
 
-- [ ] **Verify ReadTheDocs build**
-  - `docs/` has the full Sphinx + MyST setup. Confirm `.readthedocs.yaml`
-    exists and the docs build locally (`make docs`).
+- [x] **Verify ReadTheDocs build**
+  - `.readthedocs.yaml` exists, `make docs` builds successfully.
+
+### Remaining
 
 - [ ] **Publish to PyPI**
   - `make publish` (or `make publish-test` first to TestPyPI).
