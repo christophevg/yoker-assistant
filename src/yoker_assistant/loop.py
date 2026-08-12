@@ -77,15 +77,13 @@ or EMAIL_RECIPIENT_WHITELIST_JSON to enable outgoing reply safety."""
 
   # Inject plugin configuration so the user does not need a yoker.toml just
   # for plugin registration.  This is the programmatic equivalent of the
-  # --plugins-enabled CLI flag used by yoker-writing-assistant.  We self-trust
-  # because this is an unattended email loop with no TTY — yoker's interactive
-  # trust prompt cannot fire, so without self-trust the plugin would be rejected.
-  # pkgq is also injected because the agent definition uses pkgq:find.
+  # --plugins-enabled CLI flag used by yoker-writing-assistant.  pkgq is also
+  # injected because the agent definition uses pkgq:find.  The user confirms
+  # trust interactively on first run via yoker's standard trust prompt.
   config.plugins.enabled = True
   for pkg in ("yoker_assistant", "pkgq"):
     if pkg not in config.plugins.packages:
       config.plugins.packages = (*config.plugins.packages, pkg)
-    config.plugins.trusted[pkg] = True
 
   # setup mail servers
   pool = await get_pool()

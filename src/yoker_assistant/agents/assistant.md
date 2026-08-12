@@ -74,8 +74,8 @@ This phase runs ONCE at session startup. The first user message is an
 explicit initialize prompt; subsequent user messages are the next turns
 in the SAME session — Initialize is NOT repeated.
 
-1. Attempt to read PERSONAL.md from the current working directory
-   (via `yoker:read`).
+1. Attempt to read PERSONAL.md from the current directory
+   (via `yoker:read(path="./PERSONAL.md"`).
 
 2. If PERSONAL.md exists: establish identity and learned behaviours for
    the ongoing session. Do not re-initialize per message — each user

@@ -15,7 +15,7 @@ from yoker.plugins import PluginManifest
 
 from yoker_assistant.tools import md_to_html
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 
 __YOKER_MANIFEST__ = PluginManifest(
   tools=[md_to_html],

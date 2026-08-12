@@ -444,9 +444,10 @@ The package is simultaneously three layers of yoker's tool model:
 2. **Provider** of its own named safe tool — `yoker_assistant:md_to_html`.
    The tool is defined in this package, exposed via `__YOKER_MANIFEST__`,
    and registered automatically: the package injects
-   `config.plugins.enabled = True`, adds itself and `pkgq` to
-   `config.plugins.packages`, and self-trusts both in `loop.py` at
-   startup. No user-side `[plugins]` config is needed for the email loop.
+   `config.plugins.enabled = True` and adds itself and `pkgq` to
+   `config.plugins.packages` in `loop.py` at startup. No user-side
+   `[plugins]` config is needed for the email loop. The user confirms
+   trust interactively on first run via yoker's standard trust prompt.
 3. **Reusable plugin** — any external yoker consumer can load the tool
    identically. `pip install yoker-assistant` plus manual `[plugins]` /
    `[plugins.trusted]` lines in their `~/.yoker.toml`:
@@ -458,41 +459,61 @@ The package is simultaneously three layers of yoker's tool model:
    [plugins.trusted]
    yoker_assistant = true
    ```
-   The email loop self-injects its plugin config; external consumers
-   add it manually. Both use the identical plugin mechanism — this is
-   the elegant showcase point: there is no "internal" API and "external"
-   API — there is one plugin API, and the package uses it on itself
-   (with automatic injection) the same way a stranger would use it (with
-   manual config).
+   The email loop auto-injects its `enabled` and `packages` config;
+   external consumers add it manually. Both use the identical plugin
+   mechanism — this is the elegant showcase point: there is no
+   "internal" API and "external" API — there is one plugin API, and the
+   package uses it on itself (with automatic injection) the same way a
+   stranger would use it (with manual config).
 
-### The self-trust requirement
+### The trust requirement
 
-The package runs unattended (the loop has no UI, no TTY to prompt), so
-yoker's trust gate would reject untrusted plugins in non-interactive
-mode. Instead of requiring the user to add `[plugins.trusted]` lines to
-`~/.yoker.toml`, the package self-trusts programmatically in `loop.py`:
+On first run, yoker's standard trust prompt asks the user to confirm
+loading each plugin ("Load this plugin? [y/N]"). The user confirms, and
+the plugin is session-trusted for the running session. For permanent
+trust across sessions, the user can optionally add
+`[plugins.trusted]` to `~/.yoker.toml`:
+
+```toml
+[plugins.trusted]
+yoker_assistant = true
+pkgq = true
+```
+
+This skips the interactive prompt on subsequent runs. It is optional —
+the session-trust from the interactive prompt is sufficient for the
+running session.
+
+The package injects `plugins.enabled` and `plugins.packages`
+programmatically in `loop.py` so the user does not need a `[plugins]`
+section in `~/.yoker.toml`:
 
 ```python
 config.plugins.enabled = True
 for pkg in ("yoker_assistant", "pkgq"):
     if pkg not in config.plugins.packages:
         config.plugins.packages = (*config.plugins.packages, pkg)
-    config.plugins.trusted[pkg] = True
 ```
 
 This is the programmatic equivalent of the `--plugins-enabled` CLI flag
-used by yoker-writing-assistant. The self-trust admits ALL tool code
-from this package (and `pkgq`) as trusted with no per-call gate. The
-trust decision is made once, at install time. Pin the installed version
+used by yoker-writing-assistant. Trust itself is confirmed by the user,
+not injected — the user explicitly confirms on first run, or
+pre-declares trust in `~/.yoker.toml`.
+
+The blast radius: once trusted (by interactive confirmation or
+`[plugins.trusted]` entry), ALL tool code from this package (and `pkgq`)
+runs with no per-call gate. The trust decision is made once, at install
+time. Pin the installed version
 (`uv pip install yoker-assistant==<version>`) and verify the source. Adding
 a new tool to `__YOKER_MANIFEST__`, or making a capability-changing edit to
 an existing tool, is a security-relevant change; see [Security](security.md)
 for the review process contributors must follow before such a change.
 
-Self-trust is what makes unattended operation possible; it is also what
-makes the blast radius real. Both are the intended yoker trust model —
-the user takes the trust decision at install time, once, and the
-package's tools then run without per-call interruption.
+User-confirmed trust is what makes unattended operation possible after
+the first run; it is also what makes the blast radius real. Both are
+the intended yoker trust model — the user takes the trust decision at
+install time, once, and the package's tools then run without per-call
+interruption.
 
 ### Why the three layers matter together
 

@@ -4,7 +4,8 @@ This page walks through the first run end-to-end. You should have already
 finished [Installation](installation.md) — `~/.yoker.toml` configured with a
 backend, `.env` with mailbox credentials and the recipient whitelist, and
 `make env-dev` green. Plugin registration is automatic — the package
-self-injects it at startup.
+injects `enabled` and `packages` at startup; you confirm trust
+interactively on first run.
 
 ## Run one iteration
 

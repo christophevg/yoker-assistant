@@ -5,6 +5,21 @@ format is based on [Keep a Changelog](https://keepachangelog.com/), and
 this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+## [0.1.1] — 2025-07-18
+
+### Changed
+- Plugin configuration is now injected programmatically in `loop.py` at
+  startup (`config.plugins.enabled = True`, `yoker_assistant` and `pkgq`
+  added to `config.plugins.packages`). Users no longer need to manually
+  add a `[plugins]` section to their `~/.yoker.toml` — only backend config
+  (provider, model, api_key) is required. Trust is confirmed by the user
+  interactively on first run via yoker's standard trust prompt; for
+  permanent trust, `[plugins.trusted]` can optionally be added to
+  `~/.yoker.toml`. This is the SDK equivalent of the `--plugins-enabled`
+  CLI flag in yoker-writing-assistant.
+- Updated all documentation to reflect the automatic plugin injection.
+  External consumers using `yoker_assistant:md_to_html` in their own
+  projects still need manual `[plugins]`/`[plugins.trusted]` config.
 
 ### Added
 - `docs/` folder with Sphinx + MyST + `sphinx_rtd_theme` configuration for
@@ -85,5 +100,6 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   reinvent the markdown-to-HTML converter; vendored the existing logic
   with an HTML-escaping fix.
 
-[Unreleased]: https://github.com/christophevg/yoker-assistant/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/christophevg/yoker-assistant/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/christophevg/yoker-assistant/releases/tag/v0.1.1
 [0.1.0]: https://github.com/christophevg/yoker-assistant/releases/tag/v0.1.0

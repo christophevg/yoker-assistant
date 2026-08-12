@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "yoker-assistant"
-version = "0.1.0"
+version = "0.1.1"
 description = "A personal assistant that communicates by email, built on yoker-as-SDK"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -29,8 +29,9 @@ dependencies = [
   # (functional.md §2.4). 0.3.0 is the current published line.
   "simple-email-gw>=0.3.0",
   # Loaded as a yoker plugin (auto-injected in loop.py for the email loop;
-  # manual [plugins] config for external consumers). Pin the published
-  # version so plugin loading resolves a known-compatible release.
+  # manual [plugins] config for external consumers). Trust is confirmed by
+  # the user interactively on first run. Pin the published version so
+  # plugin loading resolves a known-compatible release.
   "pkgq>=0.3.2",
   "rich>=15.0.0",
   "pyfiglet>=1.0.4",

@@ -41,13 +41,12 @@ from yoker_assistant import __YOKER_MANIFEST__
 ### Running the email loop (automatic)
 
 When running yoker-assistant's own email loop, plugin registration is
-automatic: `loop.py` injects `config.plugins.enabled = True`, adds
-`yoker_assistant` and `pkgq` to `config.plugins.packages`, and
-self-trusts both at startup. No `[plugins]` config is needed in
-`~/.yoker.toml`. This is the programmatic equivalent of the
-`--plugins-enabled` CLI flag used by yoker-writing-assistant. The
-package self-trusts because it runs unattended (no TTY) — yoker's
-interactive trust prompt cannot fire.
+automatic: `loop.py` injects `config.plugins.enabled = True` and adds
+`yoker_assistant` and `pkgq` to `config.plugins.packages` at startup.
+No `[plugins]` config is needed in `~/.yoker.toml`. On first run, yoker's
+standard trust prompt asks you to confirm loading each plugin. After
+confirmation the plugin is session-trusted. For permanent trust across
+sessions, optionally add `[plugins.trusted]` to `~/.yoker.toml`.
 
 ### Via `~/.yoker.toml` (external consumers)
 
@@ -63,10 +62,11 @@ packages = ["yoker_assistant"]
 yoker_assistant = true
 ```
 
-Self-trust (`[plugins.trusted] yoker_assistant = true`) is **required**
-for unattended operation: with no TTY to prompt, Yoker's trust gate
-rejects untrusted plugins in non-interactive mode. Pin the installed
-version and verify the source.
+Adding `[plugins.trusted] yoker_assistant = true` skips yoker's
+interactive trust prompt on subsequent runs. Without it, yoker asks
+"Load this plugin? [y/N]" on first run. Pin the installed version and
+verify the source — once trusted, all tool code runs with no per-call
+gate.
 
 ### Via CLI
 
@@ -132,10 +132,11 @@ the whitelist.
 ### `~/.yoker.toml` — Yoker runtime
 
 Backend, model, and permissions. Created by `uv run yoker init`. Plugin
-registration is automatic when running the email loop (the package
-self-injects it in `loop.py`). External consumers need manual
-`[plugins]` config — see "Loading as a Yoker Plugin" above. See
-`yoker.toml.example` for the backend config reference shape.
+`enabled` and `packages` are auto-injected when running the email loop
+(in `loop.py`); trust is confirmed interactively on first run.
+External consumers need manual `[plugins]` config — see "Loading as a
+Yoker Plugin" above. See `yoker.toml.example` for the backend config
+reference shape.
 
 ### `PERSONAL.md` — assistant personalization
 

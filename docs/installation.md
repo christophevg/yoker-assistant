@@ -41,20 +41,22 @@ configuration programmatically at startup (in `loop.py`):
 
 - `plugins.enabled = True`
 - `yoker_assistant` and `pkgq` added to `plugins.packages`
-- Both marked trusted via `plugins.trusted`
 
-This is the programmatic equivalent of the `--plugins-enabled` CLI flag used
-by yoker-writing-assistant. The package self-trusts because it runs unattended
-(no TTY) — yoker's interactive trust prompt cannot fire, so without self-trust
-the plugin would be rejected in non-interactive mode. See
-[Security](security.md) for the blast-radius implication and version-pinning
-advice.
+On first run, yoker's standard trust prompt asks you to confirm loading
+each plugin ("Load this plugin? [y/N]"). After confirmation the plugin is
+session-trusted. For permanent trust across sessions, you can optionally
+add `[plugins.trusted] yoker_assistant = true` (and `pkgq = true`) to
+your `~/.yoker.toml` — this skips the interactive prompt on subsequent
+runs.
 
-> **External consumers:** if you want to use `yoker_assistant:md_to_html` as
-> a plugin in your own yoker project (not running the email loop), you still
-> need manual plugin registration. See [PACKAGE.md](../PACKAGE.md) for those
-> lines. The automatic injection only applies when running yoker-assistant's
-> own email loop.
+See [Security](security.md) for the blast-radius implication and
+version-pinning advice.
+
+> **External consumers:** if you want to use `yoker_assistant:md_to_html`
+> as a plugin in your own yoker project (not running the email loop), you
+> still need manual plugin registration. See [PACKAGE.md](../PACKAGE.md)
+> for those lines. The automatic injection only applies when running
+> yoker-assistant's own email loop.
 
 ## Email account (`.env`)
 

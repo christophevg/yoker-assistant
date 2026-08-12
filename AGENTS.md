@@ -190,9 +190,11 @@ __YOKER_MANIFEST__ = PluginManifest(
 This declares the custom tool and the agents directory. Yoker's plugin
 loader discovers the agent definition automatically, namespacing it
 under `yoker_assistant:`. When running the email loop, the package
-self-injects plugin configuration in `loop.py` (enabled, packages,
-trusted) — no user-side `[plugins]` config needed. External consumers
-load the tool via their `~/.yoker.toml [plugins]` block.
+auto-injects plugin `enabled` and `packages` configuration in `loop.py`
+— no user-side `[plugins]` config needed. The user confirms trust
+interactively on first run via yoker's standard trust prompt.
+External consumers load the tool via their `~/.yoker.toml [plugins]`
+block.
 
 ## Launch / Entry Point
 

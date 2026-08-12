@@ -10,16 +10,16 @@
 # copy.
 #
 # Plugin registration is NOT required in ~/.yoker.toml: the package injects
-# `plugins.enabled = True`, adds itself and `pkgq` to `plugins.packages`,
-# and self-trusts both at startup (in loop.py). This is the programmatic
-# equivalent of the `--plugins-enabled` CLI flag used by
-# yoker-writing-assistant. The package self-trusts because it runs
-# unattended (no TTY) — yoker's interactive trust prompt cannot fire.
+# `plugins.enabled = True` and adds itself and `pkgq` to `plugins.packages`
+# at startup (in loop.py). The user confirms trust interactively on first
+# run via yoker's standard trust prompt. For permanent trust across
+# sessions, optionally add [plugins.trusted] to ~/.yoker.toml.
 #
-# Self-trust blast radius: the programmatic self-trust admits ALL tool code
-# from this package and pkgq as trusted with no per-call gate. Pin the
-# installed versions (`uv pip install yoker-assistant==<version>`) and
-# verify the source. See docs/security.md for the full discussion.
+# Trust blast radius: once trusted (by interactive confirmation or
+# [plugins.trusted] entry), ALL tool code from this package and pkgq runs
+# with no per-call gate. Pin the installed versions
+# (`uv pip install yoker-assistant==<version>`) and verify the source.
+# See docs/security.md for the full discussion.
 # ============================================================================
 
 # -- Backend / model (placeholder) -------------------------------------------

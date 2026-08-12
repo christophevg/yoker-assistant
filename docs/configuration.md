@@ -34,12 +34,14 @@ The `.env` file is gitignored at the repo root. Copy `.env.example` to
 The backend, model, and permissions live in the user's `~/.yoker.toml`,
 created by yoker's bootstrap wizard (`uv run yoker init`). Plugin
 registration is **not** required there: the package injects
-`plugins.enabled = True`, adds itself and `pkgq` to `plugins.packages`,
-and self-trusts both at startup (in `loop.py`). This is the programmatic
-equivalent of the `--plugins-enabled` CLI flag used by
-yoker-writing-assistant — the package self-trusts because it runs
-unattended (no TTY), and yoker's interactive trust prompt cannot fire.
-See [Security](security.md) for the blast-radius implication and
+`plugins.enabled = True` and adds itself and `pkgq` to
+`plugins.packages` at startup (in `loop.py`). The user confirms trust
+interactively on first run via yoker's standard trust prompt (the user
+runs `yoker-assistant` from their terminal, yoker asks "Load this
+plugin? [y/N]", user confirms). After that the plugin is session-trusted.
+For permanent trust across sessions, the user can optionally add
+`[plugins.trusted] yoker_assistant = true` to `~/.yoker.toml`. See
+[Security](security.md) for the blast-radius implication and
 version-pinning advice.
 
 The package provides a `yoker.toml.example` as documentation only —
