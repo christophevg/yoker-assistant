@@ -73,7 +73,7 @@ or EMAIL_RECIPIENT_WHITELIST_JSON to enable outgoing reply safety."""
     )
 
   config = get_yoker_config()
-  config.agent = "yoker_assistant:assistant"
+  config.agent.name = "yoker_assistant:assistant"
 
   # Inject plugin configuration so the user does not need a yoker.toml just
   # for plugin registration.  This is the programmatic equivalent of the

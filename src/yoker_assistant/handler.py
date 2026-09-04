@@ -17,6 +17,7 @@ from rich.style import Style
 from yoker import __version__
 from yoker.core import Agent
 from yoker.exceptions import NetworkError, ToolError
+from yoker.ui import AgentDisplay
 from yoker.ui.handler import UIHandler
 
 PROMPT_STYLE = Style(color="black", bgcolor="grey93")
@@ -93,7 +94,7 @@ class RichUIHandler(UIHandler):
 
   # Content Output
 
-  def start_content_stream(self) -> None:
+  def start_content_stream(self, agent: AgentDisplay | None = None) -> None:
     self.console.print("⏺ ", end="", style=CONTENT_STYLE)
 
   def stream_content(self, chunk: str, content_type: str = "text/plain") -> None:
@@ -110,7 +111,7 @@ class RichUIHandler(UIHandler):
 
   # Thinking
 
-  def start_thinking_stream(self) -> None:
+  def start_thinking_stream(self, agent: AgentDisplay | None = None) -> None:
     if self.show_thinking:
       self.console.print()
 
@@ -129,7 +130,9 @@ class RichUIHandler(UIHandler):
 
   # Tooling
 
-  def output_tool_call(self, tool_name: str, args: dict[str, Any]) -> None:
+  def output_tool_call(
+    self, tool_name: str, args: dict[str, Any], agent: AgentDisplay | None = None
+  ) -> None:
     if self.show_tool_calls:
       self.console.print(f"⏺ {tool_name}", end="", style=TOOL_STYLE)
       details = self._format_tool_details(tool_name, args)
@@ -177,6 +180,7 @@ class RichUIHandler(UIHandler):
     prompt_tokens: int,
     eval_tokens: int,
     usage_limits: dict[str, object] | None = None,
+    agent: AgentDisplay | None = None,
   ) -> None:
     """Output turn statistics.
 
