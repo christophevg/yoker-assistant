@@ -36,3 +36,4 @@ docs/_build/
 # Runtime-generated files (not committed)
 PERSONAL.md
 context/
+*.local

@@ -1,3 +1,4 @@
+-include Makefile.local
 -include ~/.yoker/Makefile
 
 .PHONY: env-dev env-run install-pythons test test-cov test-all format format-check lint typecheck check run docs docs-view build pre-publish publish publish-test clean clean-all help
@@ -10,8 +11,8 @@ env-dev: ## Install all dependencies (dev + docs)
 env-run: ## Install runtime dependencies only
 	uv sync
 
-install-pythons: ## Install Python 3.10, 3.11, 3.12
-	uv python install 3.10 3.11 3.12
+install-pythons: ## Install Python 3.11, 3.12
+	uv python install 3.11 3.12
 
 ## Testing
 
