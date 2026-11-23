@@ -16,6 +16,7 @@ tools:
   # skills + sub-agents
   - yoker:skill
   - yoker:agent
+  - yoker:send_message
   # full git (read + commit + push) — the demo beat
   - yoker:git
   # plugin tools
