@@ -45,9 +45,9 @@ inherit it; each carries its own copy kept in sync.
 
 ## Current Project State
 
-The project is release-ready. 48 tests green, lint clean, typecheck
-clean, build clean. The only remaining task is publishing to PyPI. See
-[`TODO.md`](TODO.md) for the full status and post-release backlog.
+The project is published on PyPI (all versions tracked in
+[`CHANGELOG.md`](CHANGELOG.md)); `make check` is the quality gate.
+[`TODO.md`](TODO.md) holds the post-release backlog.
 
 In place:
 

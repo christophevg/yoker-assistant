@@ -6,20 +6,52 @@ this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-11-23
+
 ### Added
-- `docs/` folder with Sphinx + MyST + `sphinx_rtd_theme` configuration for
-  ReadTheDocs (P4-001).
-- `docs/tutorial.md` — the full build-story narrative (12 sections).
-- `docs/architecture.md`, `docs/security.md`, `docs/configuration.md`,
-  `docs/api.md`, `docs/installation.md`, `docs/quickstart.md`,
-  `docs/changelog.md`, `docs/index.md`.
-- `.readthedocs.yaml` ReadTheDocs build configuration.
-- `LICENSE` file (MIT).
-- `.env.example` reference template for email account configuration.
-- `AGENTS.md` — project guide for code agents working on this codebase.
-- `PACKAGE.md` — AI-optimized package documentation for consumers.
-- README rewritten as the lean front-door with a Documentation section
-  linking the full docs on ReadTheDocs.
+- `yoker:send_message` added to the assistant's bounded tool set
+  (`src/yoker_assistant/agents/assistant.md`).
+- Local `Makefile.local` support for developer-specific Makefile
+  overrides (included when present, not committed).
+
+### Changed
+- Upgraded to **yoker 0.13.0**: `RichUIHandler` aligned with the
+  extended `UIHandler` protocol (`output_tool_result` gains keyword-only
+  `has_content`; `output_stats` gains context-estimation parameters);
+  dependency pins raised to `yoker>=0.13`.
+- **Python 3.11 is now the floor** (3.10 dropped, following yoker
+  0.13.0): `requires-python`, classifiers, mypy, ruff, tox, CI matrix,
+  and docs updated; `asyncio.TimeoutError` replaced with builtin
+  `TimeoutError` in `loop.py`.
+- `permissions.network_access` references removed from docs (field no
+  longer exists in yoker; network reach is governed by tool enablement).
+
+### Fixed
+- CI matrix still tested Python 3.10 after the floor bump — aligned with
+  the 3.11/3.12 tox envs; Coveralls upload now keys on ubuntu 3.11.
+
+## [0.1.3] — 2026-09-04
+
+### Changed
+- Cleaned up the yoker configuration and fixed compatibility with
+  yoker 0.12; version bump.
+
+## [0.1.2] — 2026-08-12
+
+### Added
+- First-run bootstrap wizard: the agent detects a missing `PERSONAL.md`
+  and elicits the owner's profile interactively over email.
+
+## [0.1.1] — 2026-08-12
+
+### Added
+- Plugin registration is now automatic: the loop injects
+  `[plugins] enabled` and the `yoker_assistant`/`pkgq` packages at
+  startup — no `[plugins]` config needed in `~/.yoker.toml`.
+
+### Fixed
+- Trust model corrected: the user confirms plugin loading
+  interactively on first run (no self-trust).
 
 ## [0.1.0] — 2026-07-23
 
@@ -70,6 +102,12 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   in built sdist/wheel metadata (`file://`, VCS schemes, `@ <url>`,
   `path =`); also rejects relative image paths in `README.md` and
   verifies `pyproject.toml` version matches `__init__.py` `__version__`.
+- **P4-001** — `docs/` built with Sphinx + MyST +
+  `sphinx_rtd_theme`, published on ReadTheDocs: the full build-story
+  tutorial, architecture, security, configuration, API, installation,
+  and quickstart pages; `.readthedocs.yaml` build configuration.
+- `LICENSE` file (MIT), `.env.example`, `AGENTS.md`, `PACKAGE.md`;
+  README as the lean front-door linking the docs.
 
 ### Decisions
 - **Descoped `Mailbox` wrapper** (P1-003): wrapping two existing classes
@@ -85,5 +123,9 @@ this project adheres to [Semantic Versioning](https://semver.org/).
   reinvent the markdown-to-HTML converter; vendored the existing logic
   with an HTML-escaping fix.
 
-[Unreleased]: https://github.com/christophevg/yoker-assistant/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/christophevg/yoker-assistant/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/christophevg/yoker-assistant/compare/v0.1.3...v0.2.0
+[0.1.3]: https://github.com/christophevg/yoker-assistant/releases/tag/v0.1.3
+[0.1.2]: https://github.com/christophevg/yoker-assistant/releases/tag/v0.1.2
+[0.1.1]: https://github.com/christophevg/yoker-assistant/releases/tag/v0.1.1
 [0.1.0]: https://github.com/christophevg/yoker-assistant/releases/tag/v0.1.0
