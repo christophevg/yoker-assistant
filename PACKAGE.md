@@ -22,8 +22,8 @@ pip install yoker-assistant
 uv add yoker-assistant
 ```
 
-Requires `yoker>=0.10.1`, `simple-email-gw>=0.3.0`, `pkgq>=0.3.2`, and
-Python 3.10+.
+Requires `yoker>=0.13`, `simple-email-gw>=0.3.0`, `pkgq>=0.3.2`, and
+Python 3.11+.
 
 ## Plugin Manifest
 

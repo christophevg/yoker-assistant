@@ -635,7 +635,7 @@ and would clobber the user's backend config there. The package provides a
 user must add to their `~/.yoker.toml`, not a checked-in active config.
 
 - Backend + model (provider, base_url, api_key, model, parameters).
-- Permissions (`filesystem_paths`, `network_access`, tool enablement).
+- Permissions (`filesystem_paths`, tool enablement).
 - Plugins: `[plugins] enabled = true; packages = ["yoker_assistant", "pkgq"]`
   and `[plugins.trusted] yoker_assistant = true; pkgq = true` (self-trust
   required for unattended operation).

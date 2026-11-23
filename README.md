@@ -1,6 +1,6 @@
 # yoker-assistant
 
-[![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)][python]
+[![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)][python]
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)][uv]
 [![Yoker](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/christophevg/yoker/master/media/badge/v0.json)][yoker]
 [![Docs](https://img.shields.io/readthedocs/yoker-assistant)][docs]

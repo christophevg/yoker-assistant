@@ -7,7 +7,7 @@ name = "yoker-assistant"
 version = "0.1.3"
 description = "A personal assistant that communicates by email, built on yoker-as-SDK"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
   {name = "Christophe VG", email = "christophe.vg@example.com"},
@@ -17,14 +17,13 @@ classifiers = [
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Typing :: Typed",
 ]
 keywords = ["yoker", "agent", "email", "assistant"]
 dependencies = [
-  "yoker>=0.12",
+  "yoker>=0.13",
   "simple-email-gw>=0.3.0",
   "pkgq>=0.3.2",
 ]
@@ -70,7 +69,7 @@ asyncio_mode = "auto"
 addopts = "-v --cov-report=term-missing"
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 strict = true
 warn_return_any = true
 warn_unused_ignores = true
@@ -81,7 +80,7 @@ ignore_missing_imports = true
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py311"
 indent-width = 2
 
 [tool.ruff.lint]
@@ -118,7 +117,7 @@ exclude_lines = [
 ]
 
 [tool.tox]
-env_list = ["py310", "py311", "py312"]
+env_list = ["py311", "py312"]
 
 [tool.tox.env_run_base]
 description = "run tests with pytest"
@@ -128,9 +127,6 @@ commands_pre = [
   ["uv", "pip", "install", "pytest", "pytest-cov", "pytest-asyncio"],
 ]
 commands = [["pytest", "tests", "-v", "--cov=yoker_assistant", "--cov-report=term-missing"]]
-
-[tool.tox.env.py310]
-base_python = ["python3.10"]
 
 [tool.tox.env.py311]
 base_python = ["python3.11"]

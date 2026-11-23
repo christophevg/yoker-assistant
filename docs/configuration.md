@@ -61,12 +61,12 @@ you do not already have one.
 
 ### Permissions
 
-Permissions (`filesystem_paths`, `network_access`, tool enablement) live
-in `~/.yoker.toml`. The default permissions from `uv run yoker init` are
-the starting point; tighten as needed for your deployment. The agent's
-tools are bounded (no shell), but the filesystem and network reach of
-`yoker:read`/`yoker:write`/`yoker:webfetch`/`yoker:git` is governed by
-these permissions.
+Permissions (`filesystem_paths`, tool enablement) live in `~/.yoker.toml`.
+The default permissions from `uv run yoker init` are the starting point;
+tighten as needed for your deployment. The agent's tools are bounded (no
+shell), and the filesystem reach of `yoker:read`/`yoker:write`/`yoker:git`
+is governed by these permissions; network tools (`yoker:webfetch`,
+`yoker:websearch`) are bounded by tool enablement.
 
 ### Skills directory
 

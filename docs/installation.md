@@ -2,7 +2,7 @@
 
 ## Prerequisites
 
-- Python 3.10 or newer
+- Python 3.11 or newer
 - [uv](https://docs.astral.sh/uv/) for dependency management
 - A yoker backend: either a local [Ollama](https://ollama.com) install or a
   cloud LLM provider API key (OpenAI, Anthropic, Google Gemini, or any of the

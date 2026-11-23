@@ -139,7 +139,7 @@ or EMAIL_RECIPIENT_WHITELIST_JSON to enable outgoing reply safety."""
         try:
           with ui.console.status("", spinner="clock"):
             _ = await asyncio.wait_for(stop.wait(), timeout=_POLL_INTERVAL)
-        except asyncio.TimeoutError:
+        except TimeoutError:
           pass
 
 

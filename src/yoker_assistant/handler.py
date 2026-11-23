@@ -138,7 +138,19 @@ class RichUIHandler(UIHandler):
       details = self._format_tool_details(tool_name, args)
       self.console.print(f"({details})")
 
-  def output_tool_result(self, tool_name: str, success: bool, result: str) -> None:
+  def output_tool_result(
+    self, tool_name: str, success: bool, result: str, *, has_content: bool = False
+  ) -> None:
+    """Output tool result status.
+
+    Args:
+      tool_name: Name of tool.
+      success: Whether tool succeeded.
+      result: Result text or error message.
+      has_content: Whether a rich ToolContentEvent follows for the same
+        call. Accepted for protocol compatibility; ignored — this handler
+        renders only the success/fail line and char count either way.
+    """
     if not self.show_tool_calls:
       return
 
@@ -181,6 +193,9 @@ class RichUIHandler(UIHandler):
     eval_tokens: int,
     usage_limits: dict[str, object] | None = None,
     agent: AgentDisplay | None = None,
+    context_estimate: int | None = None,
+    context_max_tokens: int | None = None,
+    context_target_tokens: int | None = None,
   ) -> None:
     """Output turn statistics.
 
@@ -189,6 +204,12 @@ class RichUIHandler(UIHandler):
       prompt_tokens: Number of prompt tokens.
       eval_tokens: Number of evaluation tokens.
       usage_limits: Optional backend API usage limits (unused in this handler).
+      agent: The agent that produced this turn (unused in this handler).
+      context_estimate: Calibrated estimate of the next backend call's
+        pre-compaction context size (accepted for protocol compatibility;
+        unused in this handler).
+      context_max_tokens: The context soft cap (idem — unused here).
+      context_target_tokens: The trim target (idem — unused here).
     """
     if self.show_stats:
       total = prompt_tokens + eval_tokens
